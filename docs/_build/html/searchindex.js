@@ -1,0 +1,1 @@
+Search.setIndex({envversion:42,terms:{insert:0,search:0,index:0,modul:0,content:0,blah:0,exampl:0,pip:0,todo:0,page:0},objtypes:{},objnames:{},filenames:["index"],titles:["Welcome to SheetSync&#8217;s documentation!"],objects:{},titleterms:{welcom:0,usag:0,indic:0,sheetsync:0,tabl:0,instal:0,document:0}})
