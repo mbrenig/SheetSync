@@ -50,9 +50,8 @@ def test_move_to_folder_by_name():
                              sheet_name = 'Sheet1',
                              folder_name = TESTS_FOLDER_NAME)
     # Delete the doc
-    gdc = target._doc_client_pool[GOOGLE_U]
-    target_rsrc = gdc.docs_client.get_resource_by_id(target.document_key)
-    gdc.Delete(target_rsrc)
+    target_rsrc = target.docs_client.get_resource_by_id(target.document_key)
+    target.docs_client.Delete(target_rsrc)
 
 
 def test_move_to_new_folder_by_name():
