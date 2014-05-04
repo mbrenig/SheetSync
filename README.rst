@@ -1,1 +1,4 @@
-.. image:: http://img.shields.io/travis/mbrenig/SheetSync.svg   :target: https://travis-ci.org/mbrenig/SheetSync
+
+.. image:: https://travis-ci.org/mbrenig/SheetSync.svg?branch=master   
+   :target: https://travis-ci.org/mbrenig/SheetSync
+   :alt: Build Status
