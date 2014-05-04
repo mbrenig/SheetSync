@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Welcome to SheetSync’s documentation! &mdash; SheetSync 0.1 documentation</title>
+    <title>Welcome to SheetSync! &mdash; SheetSync 0.1 documentation</title>
     
     <link rel="stylesheet" href="_static/default.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -41,32 +41,32 @@
         <div class="bodywrapper">
           <div class="body">
             
-  <div class="section" id="welcome-to-sheetsync-s-documentation">
-<h1>Welcome to SheetSync&#8217;s documentation!<a class="headerlink" href="#welcome-to-sheetsync-s-documentation" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="welcome-to-sheetsync">
+<h1>Welcome to SheetSync!<a class="headerlink" href="#welcome-to-sheetsync" title="Permalink to this headline">¶</a></h1>
+<p>blurb to come... this is all pre-release experimentation.</p>
 <div class="section" id="installing">
 <h2>Installing<a class="headerlink" href="#installing" title="Permalink to this headline">¶</a></h2>
-<dl class="docutils">
-<dt>Install <strong>SheetSync</strong> with</dt>
-<dd><tt class="docutils literal"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">SheetSync</span></tt></dd>
-</dl>
-</div>
-<div class="section" id="usage">
-<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
-<p>Blah,blah,blah. TODO: Insert usage examples.</p>
-<p>Contents:</p>
-<div class="toctree-wrapper compound">
-<ul class="simple">
-</ul>
+<p>Install <strong>SheetSync</strong> with:</p>
+<div class="highlight-python"><div class="highlight"><pre>$ pip install sheetsync
+</pre></div>
 </div>
 </div>
+<div class="section" id="basic-usage">
+<h2>Basic usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h2>
+<p>SheetSync works with data in a dictionary of dictionaries. I.e. each row is
+represented by a dictionary, and these are themselves stored in a dictionary
+indexed by a row-specific key. E.g.:</p>
+<p>To synchronize this data (add rows, update rows, delete rows) with a target
+spreadsheet you do this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">sheetsync</span>
+<span class="n">worksheet</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;yourusername@domain.com&quot;</span><span class="p">,</span>
+                            <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
+                            <span class="n">title</span><span class="o">=</span><span class="s">&quot;My auto-generated spreadsheet&quot;</span><span class="p">,</span>
+                            <span class="n">sheet_name</span><span class="o">=</span><span class="s">&quot;data&quot;</span><span class="p">)</span>
+<span class="n">worksheet</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
 </div>
-<div class="section" id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
-<ul class="simple">
-<li><a class="reference internal" href="genindex.html"><em>Index</em></a></li>
-<li><a class="reference internal" href="py-modindex.html"><em>Module Index</em></a></li>
-<li><a class="reference internal" href="search.html"><em>Search Page</em></a></li>
-</ul>
+</div>
 </div>
 
 
@@ -77,12 +77,11 @@
         <div class="sphinxsidebarwrapper">
   <h3><a href="#">Table Of Contents</a></h3>
   <ul>
-<li><a class="reference internal" href="#">Welcome to SheetSync&#8217;s documentation!</a><ul>
+<li><a class="reference internal" href="#">Welcome to SheetSync!</a><ul>
 <li><a class="reference internal" href="#installing">Installing</a></li>
-<li><a class="reference internal" href="#usage">Usage</a></li>
+<li><a class="reference internal" href="#basic-usage">Basic usage</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
 </ul>
 
   <h3>This Page</h3>

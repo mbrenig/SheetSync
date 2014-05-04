@@ -1,0 +1,4 @@
+.mysecrets
+.coverage
+htmlcov
+*.pyc
