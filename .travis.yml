@@ -1,12 +1,12 @@
-# Using travis-ci.org
-
 language: python
-
 python:
-  - 2.7
-
+- 2.7
 install:
-  - pip install pytest
-
+- pip install pytest
 script:
-  - py.test
+- py.test
+env:
+  global:
+  - secure: dUfsNh9ytulugQFVC/JPkKlB2YZY6US0qp6VjmQM2rnXqNRuytnRGBHXcGe24P82I1YyBbOgmwKgDEKy1TCBVL7abE3H5vcdLfSeKfcEDSObkg/8jSOTrfVb8nL2TihQYqLzpPQ/lc0Sj+/MN3OBW8xWwSDGQiS/6Z2AICu7CK0=
+  - secure: YuH78zJq7hzbYKDP863Zu2jFg+PthZSoFGNAzPmiKSdqmdF/AkT6chVqMSox1jLCh/kM3IdsMCTdbTGXnUttX/iBvWZJ+fcZnOQpOwvdpiyoYPQec9uskfJB2FKbVY4ilxtYaoe0/XonRD7AQt5WziKg3lm/NX3nnk0IpPTZeMU=
+  - secure: IPlNZPp2QXphtuOGb5J0Wc/PG2fgkSY3upBPv3UdJ6LPKMpnbIKYRjuSD2GbwNhCUNbQoWnqzyI8671eT5rWoa+yu1vW540s3oOhmJfYNmeh2+lIHYvi4vV+d0yItMmg32pKuBKz34byZoIaxSZpxOrlh4vR5faHL1C7VvWNCZY=
