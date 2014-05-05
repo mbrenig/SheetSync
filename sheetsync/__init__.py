@@ -13,7 +13,7 @@
     :license: MIT, see LICENSE.txt for more details.
 """
 
-__version__ = '0.1'
+from version import __version__
 
 import logging
 from datetime import datetime

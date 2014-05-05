@@ -1,2 +1,2 @@
-python-dateutil==2.2
-gdata==2.0.18
+gdata>=2.0.18
+python-dateutil>=1.5

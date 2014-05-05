@@ -1,4 +1,8 @@
+*.pyc
 .mysecrets
 .coverage
 htmlcov
-*.pyc
+.tox
+SheetSync.egg-info
+build
+dist
