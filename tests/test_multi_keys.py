@@ -6,7 +6,7 @@ strings. For instance:
     - Integers as keys
     - Tuples as keys
     - Integers that start with 0, and some that don't. E.g. '01' to '20'
-    - Not specifying the key_field_headers
+    - Not specifying the key_column_headers
 """
 
 import sheetsync
@@ -32,7 +32,7 @@ def setup_function(function):
                              template_key = TEMPLATE_DOC,
                              sheet_name = "TEST",
                              header_row_ix=2,
-                             key_field_headers = ["Initials"],
+                             key_column_headers = ["Initials"],
                              formula_ref_row_ix=1)
 
 

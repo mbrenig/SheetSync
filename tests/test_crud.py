@@ -199,7 +199,7 @@ def setup_function(function):
                              sheet_name = "Arsenal",
                              folder_key = TESTS_FOLDER,
                              template_key = TEMPLATE_DOC,
-                             key_field_headers = ["No."],
+                             key_column_headers = ["No."],
                              header_row_ix=2,
                              formula_ref_row_ix=1)
 

@@ -43,29 +43,89 @@
             
   <div class="section" id="welcome-to-sheetsync">
 <h1>Welcome to SheetSync!<a class="headerlink" href="#welcome-to-sheetsync" title="Permalink to this headline">¶</a></h1>
-<p>blurb to come... this is all pre-release experimentation.</p>
+<p>A python library to synchronize rows of data with a google spreadsheet.</p>
+<p><strong>WARNING!</strong> This library is in a hidden development phase. APIs might change, function might
+break, bad things could happen. View the code and issues on <a class="reference external" href="http://github.com/mbrenig/SheetSync">github</a>.</p>
 <div class="section" id="installing">
 <h2>Installing<a class="headerlink" href="#installing" title="Permalink to this headline">¶</a></h2>
 <p>Install <strong>SheetSync</strong> with:</p>
 <div class="highlight-python"><div class="highlight"><pre>$ pip install sheetsync
 </pre></div>
 </div>
+<p>Or for the bleeding edge of development, clone the repo and install:</p>
+<div class="highlight-python"><div class="highlight"><pre>$ git clone git@github.com:mbrenig/SheetSync.git SheetSyncRepo
+$ pip install SheetSyncRepo
+</pre></div>
+</div>
 </div>
 <div class="section" id="basic-usage">
 <h2>Basic usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h2>
-<p>SheetSync works with data in a dictionary of dictionaries. I.e. each row is
+<p>SheetSync works with data in a dictionary of dictionaries. Each row is
 represented by a dictionary, and these are themselves stored in a dictionary
-indexed by a row-specific key. E.g.:</p>
-<p>To synchronize this data (add rows, update rows, delete rows) with a target
-spreadsheet you do this:</p>
-<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">sheetsync</span>
-<span class="n">worksheet</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;yourusername@domain.com&quot;</span><span class="p">,</span>
-                            <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
-                            <span class="n">title</span><span class="o">=</span><span class="s">&quot;My auto-generated spreadsheet&quot;</span><span class="p">,</span>
-                            <span class="n">sheet_name</span><span class="o">=</span><span class="s">&quot;data&quot;</span><span class="p">)</span>
-<span class="n">worksheet</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+indexed by a row-specific key. For example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">data</span> <span class="o">=</span> <span class="p">{</span> <span class="s">&quot;Kermit&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s">&quot;Color&quot;</span> <span class="p">:</span> <span class="s">&quot;Green&quot;</span><span class="p">,</span> <span class="s">&quot;Performer&quot;</span> <span class="p">:</span> <span class="s">&quot;Jim Henson&quot;</span><span class="p">},</span>
+         <span class="s">&quot;Miss Piggy&quot;</span> <span class="p">:</span> <span class="p">{</span><span class="s">&quot;Color&quot;</span> <span class="p">:</span> <span class="s">&quot;Pink&quot;</span><span class="p">,</span> <span class="s">&quot;Performer&quot;</span> <span class="p">:</span> <span class="s">&quot;Frank Oz&quot;</span><span class="p">}</span>
+        <span class="p">}</span>
 </pre></div>
 </div>
+<p>To synchronize this data (insert, modify or delete rows) with a target
+sheet in a google spreadsheet document you do this:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">sheetsync</span>
+<span class="c"># Get or create a spreadsheet...</span>
+<span class="n">target</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;googledriveuser@domain.com&quot;</span><span class="p">,</span>
+                         <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
+                         <span class="n">document_name</span><span class="o">=</span><span class="s">&quot;Let&#39;s try out SheetSync&quot;</span><span class="p">)</span>
+<span class="c"># Add data to the spreadsheet...</span>
+<span class="n">target</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This creates a new spreadsheet document in your google drive and then inserts the data.</p>
+</div>
+<div class="section" id="advanced-topics">
+<h2>Advanced topics<a class="headerlink" href="#advanced-topics" title="Permalink to this headline">¶</a></h2>
+<dl class="docutils">
+<dt>TODO: Will cover:</dt>
+<dd><ul class="first last simple">
+<li>document_key instead of name</li>
+<li>folder key</li>
+<li>template key</li>
+<li>header index</li>
+<li>formula ref</li>
+</ul>
+</dd>
+</dl>
+</div>
+<div class="section" id="the-deleted-flag-and-backups">
+<h2>The (DELETED) flag and backups<a class="headerlink" href="#the-deleted-flag-and-backups" title="Permalink to this headline">¶</a></h2>
+<p>Couldn&#8217;t the sync function delete all my rows? <strong>Yes it could!</strong></p>
+<p>You might have noticed by now that the default deletion behavior for
+the sync method is to append the values in Key fields with &#8220;(DELETED)&#8221; and not actually
+delete the rows. This is to avoid accidental bulk deletion while a new user
+experiments with the library. It can be turned off by passing the argument: &#8216;flag_deletes = False&#8217; into the sheetsync.Sheet constructor. In that case rows that need to be deleted
+from the target spreadsheet will be erased.</p>
+<p>Some mistakes cause very bad results. For instance, if the key column headers on the spreadsheet don&#8217;t match those passed to the Sheet constructor the sync method will delete all the existing rows and add new ones! You should mitigate the risks by taking backups of your spreadsheet before sync&#8217;ing data. Here&#8217;s an example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">target</span><span class="o">.</span><span class="n">backup</span><span class="p">(</span><span class="s">&quot;Backup of my important sheet. 15th May&quot;</span><span class="p">,</span>
+              <span class="n">folder_name</span> <span class="o">=</span> <span class="s">&quot;SheetSync Backups.&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This code would take a copy of the entire spreadsheet that the sheet &#8216;target&#8217;
+belongs to, name it &#8220;Backup of my important sheet. 15th May&#8221;, and move it to a
+folder named &#8220;SheetSync Backups.&#8221;.</p>
+</div>
+<div class="section" id="debugging">
+<h2>Debugging<a class="headerlink" href="#debugging" title="Permalink to this headline">¶</a></h2>
+<p>SheetSync uses the standard python logging module, the simplest way to find
+out what it&#8217;s doing under the covers is to turn on all logging:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">sheetsync</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="c"># Set all loggers to DEBUG level..</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+<span class="c"># Register the default log handler to send logs to console..</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>If you find issues please raise them on <a class="reference external" href="http://github.com/mbrenig/SheetSync/issues">github</a>, and if you have fixes please
+submit pull requests. Thanks!</p>
 </div>
 </div>
 
@@ -80,6 +140,9 @@ spreadsheet you do this:</p>
 <li><a class="reference internal" href="#">Welcome to SheetSync!</a><ul>
 <li><a class="reference internal" href="#installing">Installing</a></li>
 <li><a class="reference internal" href="#basic-usage">Basic usage</a></li>
+<li><a class="reference internal" href="#advanced-topics">Advanced topics</a></li>
+<li><a class="reference internal" href="#the-deleted-flag-and-backups">The (DELETED) flag and backups</a></li>
+<li><a class="reference internal" href="#debugging">Debugging</a></li>
 </ul>
 </li>
 </ul>

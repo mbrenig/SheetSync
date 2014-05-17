@@ -17,7 +17,7 @@ def test_backup():
                              GOOGLE_P,
                              document_key = SHEET_TO_BE_BACKED_UP,
                              sheet_name = 'Simpsons',
-                             key_field_headers = ['Character'],
+                             key_column_headers = ['Character'],
                              header_row_ix=1)
 
     backup_name = 'backup test: %s' % int(time.time())
@@ -26,7 +26,7 @@ def test_backup():
     backup_sheet = sheetsync.Sheet(GOOGLE_U, GOOGLE_P,
                                    document_key = backup_key,
                                    sheet_name = 'Simpsons',
-                                   key_field_headers = ['Character'],
+                                   key_column_headers = ['Character'],
                                    header_row_ix=1)
 
     backup_data = backup_sheet.data() 

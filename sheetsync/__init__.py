@@ -23,11 +23,32 @@ change_log = logging.getLogger('sheetsync.change')
 gdata_log = logging.getLogger('gdata')
 
 import dateutil.parser 
+
+# MONKEY PATCH! 
+# This works around a gdata issue with the 'new-style' google sheets.
+# Specifically working around this issue: 
+#     https://code.google.com/p/gdata-python-client/issues/detail?id=692
+# The work-around is crude and increases the risk of overwriting 
+# values entered while the 'sync' function is processing.
+# Once api and gdata are fixed this should be removed.
+import gdata.service
+oldpp = gdata.service.GDataService.PostOrPut
+def newpp(self, verb, *args, **kw):
+    if verb == 'PUT' or (verb == 'POST' and 
+            type(args[0]).__name__ != 'SpreadsheetsWorksheet'):
+        if not kw.get('extra_headers'):
+            kw['extra_headers'] = { 'If-Match': '*' }
+        else:
+            kw['extra_headers']['If-Match'] = '*'
+    return oldpp(self, verb, *args, **kw)
+
+gdata.service.GDataService.PostOrPut = newpp
+
 import gdata.spreadsheet.service, gdata.spreadsheet, gdata.docs.client
 
 MAX_BATCH_LEN = 40960   # Google's limit is 1MB or 1000 batch entries.
 DELETE_ME_FLAG = ' (DELETED)'
-DEFAULT_SHEET_NAME = 'sheetsync data'
+DEFAULT_SHEET_NAME = 'Sheet1'
 SOURCE_STRING = ('sheetsync.py version:%s' % __version__)
 ROOT_FOLDER_URL = 'https://docs.google.com/feeds/default/private/full/folder%3Aroot/contents/' 
 
@@ -191,7 +212,7 @@ class Sheet(object):
                  document_name=None,
                  sheet_name=None,
                  # Operational modifiers:
-                 key_field_headers=None, 
+                 key_column_headers=None, 
                  header_row_ix=1,
                  formula_ref_row_ix=None,
                  flag_deletes=True,
@@ -226,19 +247,19 @@ class Sheet(object):
             "sheetsync data" will be used, and a worksheet created if
             necessary.
 
-         key_field_headers (list of str): A list of the column headers to use 
-            for key values. Typically your data's keys are strings, so this is
-            a list of length one. For example if your data is indexed by 
-            unique username keys you pass in 
-                key_field_headers=["Username"] 
-            to identify the column that usernames are written to. If your data 
-            is indexed by keys which are tuples, for example you have keys like:
-                ("student_id","class_number")
-            then you would pass in a list of two column headers, e.g.:
-                ["Student ID", "Class Number"]
+         key_column_headers (list of str): Data in the key column(s) uniquely
+            identifies a row in your data. So, for example, if your data is 
+            indexed by a single username string, that you want to store in a
+            column with the header 'Username', you would pass this:
+                key_column_headers=["Username"]
+            However, we also support component keys. Python dictionaries can
+            use tuples as keys, if you pass in a tuple like:
+                ("Tesla","Model-S","2013")
+            then you could pass in a list of three column headers, e.g.:
+                ["Make", "Model", "Year"]
             If no value is given, then the default behavior is to name the
-            column "Key"; or "Key1", "Key2", and so forth in the case of tuple
-            keys.
+            column "Key"; or "Key-1", "Key-2", ... if your dictionary keys are
+            tuples.
 
           header_row_ix (int): The row number we expect to see column headers
             in. Defaults to 1 (the very top row).
@@ -323,11 +344,11 @@ class Sheet(object):
         self._find_or_create_worksheet(sheet_name)
 
         # Store off behavioural settings for interacting with the worksheet.
-        if key_field_headers is None:
-            logger.info("No key fields passed! Will use 'key1', 'key2', etc..")
-            key_field_headers = []
+        if key_column_headers is None:
+            logger.info("No key column names. Will use 'Key'; or 'Key-1', 'Key-2' etc..")
+            key_column_headers = []
 
-        self.key_field_headers = key_field_headers
+        self.key_column_headers = key_column_headers
         self.header_row_ix = header_row_ix
         self.formula_ref_row_ix = formula_ref_row_ix
         self.flag_delete_mode = flag_deletes
@@ -564,13 +585,17 @@ class Sheet(object):
             elif not further_cols:
                 cellquery.max_col = str(col)
 
+            if (cellquery.min_col == cellquery.max_col and
+                cellquery.min_col == '0'):
+                return []
+
         if return_empty:
             cellquery.return_empty = "true"
 
         gdata_log.info("getting cell feed")
         rfeed = self.service.GetCellsFeed(key=self.document_key,
-                                     wksht_id=self.sheet_id,
-                                     query=cellquery)
+                                          wksht_id=self.sheet_id,
+                                          query=cellquery)
 
         cells_list = []
         for cell_elem in rfeed.entry:
@@ -600,7 +625,7 @@ class Sheet(object):
             self.header.set(col, cell_elem.cell.text)
  
         headers_to_add = []
-        for key_field in self.key_field_headers:
+        for key_field in self.key_column_headers:
             if key_field not in self.header:
                 headers_to_add.append(key_field)
         for header in required_headers:
@@ -619,7 +644,7 @@ class Sheet(object):
             if not headers_to_add:
                 break
             if not cell_elem.cell.text:
-                header = headers_to_add.pop()
+                header = headers_to_add.pop(0)
                 cell_elem.cell.inputValue = header
                 self.header.set(col, header)
                 self._write_cell(cell_elem)
@@ -669,7 +694,8 @@ class Sheet(object):
             if col in self.header.columns:
                 cur_row[self.header.col_lookup(col)] = cell_elem
 
-        yield cur_row
+        if cur_row is not None:
+            yield cur_row
 
     def data(self, as_cells=False):
         # Reads the worksheet and returns an indexed dictionary of the
@@ -695,7 +721,7 @@ class Sheet(object):
         for row, wks_row in sheet_data.iteritems():
             # Make the key tuple
             key_list = []
-            for key_hdr in self.key_field_headers:
+            for key_hdr in self.key_column_headers:
                 key_val = wks_row.db.get(key_hdr,"")
                 if key_val.startswith("'"):
                     key_val = key_val[1:]
@@ -715,7 +741,7 @@ class Sheet(object):
 
     @property
     def key_length(self):
-        return len(self.key_field_headers)
+        return len(self.key_column_headers)
 
     #--------------------------------------------------------------------------
     # Update the worksheet to match the raw_data, calling
@@ -742,6 +768,13 @@ class Sheet(object):
             else:
                 key = tuple([str(k) for k in key])
 
+            if len(self.key_column_headers) == 0:
+                # Pick default key_column_headers.
+                if len(key) == 1:
+                    self.key_column_headers = ["Key"]
+                else:
+                    self.key_column_headers = ["Key-%s" % i for i in range(1,len(key)+1)]
+
             # Cast row_data values to strings.
             fixed_row_data = dict((key, str(val)) for key,val in row_data.iteritems())
             fixed_data[key] = fixed_row_data
@@ -749,7 +782,7 @@ class Sheet(object):
             missing_raw_keys.add(key)
             if len(key) != self.key_length:
                 raise BadDataFormat("Key %s does not match key field headers %s" % (key,
-                                                    self.key_field_headers))
+                                                    self.key_column_headers))
             required_headers.update( set(row_data.keys()) )
 
         self._get_or_create_headers(required_headers)
@@ -849,7 +882,7 @@ class Sheet(object):
 
     def _delete_flag_row(self, key_tuple, wks_row):
         for row, col, cell_elem in wks_row.cell_list():
-            if self.header.col_lookup(col) in self.key_field_headers:
+            if self.header.col_lookup(col) in self.key_column_headers:
                 # Append the DELETE_ME_FLAG
                 cell_elem.cell.inputValue = cell_elem.cell.text+DELETE_ME_FLAG
                 self._write_cell(cell_elem)
@@ -870,8 +903,8 @@ class Sheet(object):
             logger.error("Unexpected: column %s has no header", col)
             return ""
 
-        if header in self.key_field_headers:
-            key_dict = dict(zip(self.key_field_headers, key_tuple))
+        if header in self.key_column_headers:
+            key_dict = dict(zip(self.key_column_headers, key_tuple))
             key_val = key_dict[header]
             if key_val.isdigit() and not key_val.startswith('0'):
                 # Do not prefix integers so that the key column can be sorted 

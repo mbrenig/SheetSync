@@ -72,13 +72,27 @@ def test_move_to_new_folder_by_name():
     gdc.Delete(folder_rsrc)
 
 
-def test_create_a_new_worksheet():
+def test_the_kartik_test():
+    # The most basic usage of creating a new sheet and adding data to it.
+    # From April, Google defaults to using new-style sheets which requires
+    # workarounds right now.
+
     new_doc_name = '%s %s' % (__name__, int(time.time()))
     target = sheetsync.Sheet(GOOGLE_U,
                              GOOGLE_P,
-                             document_name = new_doc_name,
-                             sheet_name = new_doc_name,
-                             folder_key = TESTS_FOLDER_KEY)
+                             document_name = new_doc_name)
+    # Check we can sync data to the newly created sheet.
+    data = {"1" : {"name" : "Gordon", "color" : "Green"},
+            "2" : {"name" : "Thomas", "color" : "Blue" } }
+    target.sync(data)
+    
+    retrieved_data = target.data()
+    assert "1" in retrieved_data
+    assert retrieved_data["1"]["name"] == "Gordon"
+    assert "2" in retrieved_data
+    assert retrieved_data["2"]["color"] == "Blue"
+    assert retrieved_data["2"]["Key"] == "2"
+
     # Delete the doc
     gdc = target._doc_client_pool[GOOGLE_U]
     target_rsrc = gdc.get_resource_by_id(target.document_key)

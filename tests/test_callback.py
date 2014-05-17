@@ -30,7 +30,7 @@ def setup_function(function):
                              template_key = TEMPLATE_DOC,
                              sheet_name = "Arsenal",
                              header_row_ix=2,
-                             key_field_headers = ["No."],
+                             key_column_headers = ["No."],
                              formula_ref_row_ix=1)
 
 
