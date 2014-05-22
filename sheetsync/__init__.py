@@ -24,7 +24,7 @@ gdata_log = logging.getLogger('gdata')
 
 import dateutil.parser 
 
-# MONKEY PATCH! 
+# BEGIN MONKEY PATCH! 
 # This works around a gdata issue with the 'new-style' google sheets.
 # Specifically working around this issue: 
 #     https://code.google.com/p/gdata-python-client/issues/detail?id=692
@@ -41,8 +41,9 @@ def newpp(self, verb, *args, **kw):
         else:
             kw['extra_headers']['If-Match'] = '*'
     return oldpp(self, verb, *args, **kw)
-
 gdata.service.GDataService.PostOrPut = newpp
+# END MONKEY PATCH!
+
 
 import gdata.spreadsheet.service, gdata.spreadsheet, gdata.docs.client
 
@@ -407,37 +408,63 @@ class Sheet(object):
     def _create_new_or_copy(self, 
                             target_name=None,
                             source_doc=None, 
-                            folder=None):
+                            folder=None,
+                            sheet_description="new"):
         if target_name is None:
             raise KeyError("Must specify a name for the new document")
 
         if source_doc is not None:
             logger.info("Copying spreadsheet from template.")
-            self.new_document = self.docs_client.copy_resource(source_doc,
-                                                         title=target_name)
+            try:
+                self.new_document = self.docs_client.copy_resource(source_doc,
+                                                            title=target_name)
+            except Exception, e:
+                gdata_log.error("gdata API error. %s", e)
+                raise e
+
         else:
             # Create new blank spreadsheet.
             logger.info("Creating blank spreadsheet.")
             rsrc = gdata.docs.data.Resource(type='spreadsheet',
                                             title=target_name)
-            self.new_document = self.docs_client.create_resource(rsrc)
+            try:
+                self.new_document = self.docs_client.create_resource(rsrc)
+            except Exception, e:
+                gdata_log.error("gdata API error. %s", e)
+                raise e
 
-        logger.info("Created new spreadsheet with Id: %s", 
+        logger.info("Created %s spreadsheet with Id: %s", 
+                sheet_description,
                 self.new_document.GetId())
 
         if folder is not None:
-            self.docs_client.move_resource(self.new_document, 
-                                           folder, 
-                                           keep_in_collections=False)
-            self.docs_client.Delete(ROOT_FOLDER_URL + self.new_document.resource_id.text, 
+            try:
+                self.docs_client.move_resource(self.new_document, 
+                                               folder, 
+                                               keep_in_collections=False)
+            except Exception, e:
+                gdata_log("gdata API error. %s", e)
+                raise e
+
+            try:
+                self.docs_client.Delete(ROOT_FOLDER_URL + self.new_document.resource_id.text, 
                                     force=True)
+            except Exception, e:
+                gdata_log("gdata API error. %s", e)
+                raise e
+
             logger.info("Moved resource to folder.")
 
         return self.new_document
 
     def _find_or_create_folder(self, folder_key=None, folder_name=None):
         if folder_key is not None:
-            folder_rsrc = self.docs_client.get_resource_by_id(folder_key)
+            try:
+                folder_rsrc = self.docs_client.get_resource_by_id(folder_key)
+            except Exception, e:
+                gdata_log.error("gdata API error. %s", e)
+                raise e
+
             if folder_rsrc is None:
                 raise KeyError("Folder with key %s was not found." % folder_key)
             return folder_rsrc
@@ -448,7 +475,12 @@ class Sheet(object):
         name_query = gdata.docs.client.DocsQuery(title=folder_name,
                                                  title_exact='true',
                                                  show_collections='true')
-        matches = self.docs_client.GetResources(q=name_query)
+        try:
+            matches = self.docs_client.GetResources(q=name_query)
+        except Exception, e:
+            gdata_log.error("gdata API error. %s", e)
+            raise e
+
         for doc_rsrc in matches.entry:
             if doc_rsrc.get_resource_type() == 'folder':
                 return doc_rsrc
@@ -456,7 +488,12 @@ class Sheet(object):
         logger.info("Creating the new folder: %s", folder_name)
         new_folder_rsrc = gdata.docs.data.Resource(type='folder',
                                                    title=folder_name)
-        new_folder_rsrc = self.docs_client.create_resource(new_folder_rsrc)
+        try:
+            new_folder_rsrc = self.docs_client.create_resource(new_folder_rsrc)
+        except Exception, e:
+            gdata_log.error("gdata API error. %s", e)
+            raise e
+
         return new_folder_rsrc
 
 
@@ -465,7 +502,12 @@ class Sheet(object):
         # Otherwise search by document_name
         if doc_key is not None:
             logger.debug("Finding document by key.")
-            doc_rsrc = self.docs_client.get_resource_by_id(doc_key)
+            try:
+                doc_rsrc = self.docs_client.get_resource_by_id(doc_key)
+            except Exception, e:
+                gdata_log("gdata API error. %s", e)
+                raise e
+
             if doc_rsrc is None:
                 raise KeyError("Could not find document with key: %s" % doc_key)
             return doc_rsrc
@@ -475,7 +517,12 @@ class Sheet(object):
 
         name_query = gdata.docs.client.DocsQuery(title=doc_name,
                                                  title_exact='true')
-        matches = self.docs_client.GetResources(q=name_query)
+        try:
+            matches = self.docs_client.GetResources(q=name_query)
+        except Exception, e:
+            gdata_log.error("gdata API error. %s", e)
+            raise e
+
         if len(matches.entry) == 1:
             return matches.entry[0]
 
@@ -491,7 +538,12 @@ class Sheet(object):
         docquery.title = sheet_name
         docquery.title_exact = 'true'
         gdata_log.info("Getting worksheet feed")
-        wks_feed = self.service.GetWorksheetsFeed(self.document_key, query=docquery)
+        try:
+            wks_feed = self.service.GetWorksheetsFeed(self.document_key, query=docquery)
+        except Exception, e:
+            gdata_log.error("gdata API error. %s", e)
+            raise e
+
         for entry in wks_feed.entry:
             if entry.title.text == sheet_name:
                 self.sheet_obj = entry
@@ -499,8 +551,13 @@ class Sheet(object):
                 return self.sheet_obj
 
         logger.info("Adding a new worksheet named: %s" % sheet_name)
-        new_sheet = self.service.AddWorksheet(sheet_name, '20', '10',
-                                              self.document_key)
+        try:
+            new_sheet = self.service.AddWorksheet(sheet_name, '20', '10',
+                                                  self.document_key)
+        except Exception, e:
+            gdata_log.error("gdata API error. %s", e)
+            raise e
+
         if new_sheet is not None:
             self.sheet_obj = new_sheet
             self.sheet_id = self.sheet_obj.id.text.rsplit('/',1)[1]
@@ -523,15 +580,25 @@ class Sheet(object):
 
         if update_rows or update_cols:
             gdata_log.info("_extends: fetching worksheet feed")
-            self.sheet_obj = self.service.GetWorksheetsFeed(self.document_key, 
+            try:
+                self.sheet_obj = self.service.GetWorksheetsFeed(self.document_key, 
                                                   wksht_id=self.sheet_id)
+            except Exception, e:
+                gdata_log.error("gdata API error. %s", e)
+                raise e
+
             if update_cols:
                 self.sheet_obj.col_count.text = str(columns)
             if update_rows:
                 self.sheet_obj.row_count.text = str(rows)
 
             gdata_log.info("_extends: updating worksheet")
-            self.sheet_obj = self.service.UpdateWorksheet(self.sheet_obj)
+            try:
+                self.sheet_obj = self.service.UpdateWorksheet(self.sheet_obj)
+            except Exception, e:
+                gdata_log.error("gdata API error. %s", e)
+                raise e
+
             self.sheet_number_total_rows = int(self.sheet_obj.row_count.text)
             self.sheet_number_total_cols = int(self.sheet_obj.col_count.text)
 
@@ -547,10 +614,7 @@ class Sheet(object):
         self._batch_request.AddUpdate(cell_elem)
 
         if len(self._batch_request.ToString()) > MAX_BATCH_LEN:
-            gdata_log.info("_write_cells: Writing %s cell writes",
-                                        len(self._batch_request.entry))
-            self.service.ExecuteBatch(self._batch_request, self._batch_href)
-            self._batch_request = None
+            self._flush_writes()
 
 
     def _flush_writes(self):
@@ -558,7 +622,21 @@ class Sheet(object):
         if self._batch_request:
             gdata_log.info("_flush_writes: Writing %s cell writes",
                                         len(self._batch_request.entry))
-            self.service.ExecuteBatch(self._batch_request, self._batch_href)
+            try:
+                resp = self.service.ExecuteBatch(self._batch_request, 
+                                                 self._batch_href)
+            except Exception, e:
+                gdata_log.error("gdata API error. %s", e)
+                raise e
+
+            # Now check the response code. 
+            for entry in resp.entry:
+                if entry.batch_status.code != '200':
+                    error = "gdata API error. %s - %s" % (entry.batch_status.code,
+                                            entry.batch_status.reason)
+                    gdata_log.error("Batch update failed: %s", error)
+                    raise Exception(error)
+
             self._batch_request = None
 
 
@@ -593,9 +671,13 @@ class Sheet(object):
             cellquery.return_empty = "true"
 
         gdata_log.info("getting cell feed")
-        rfeed = self.service.GetCellsFeed(key=self.document_key,
-                                          wksht_id=self.sheet_id,
-                                          query=cellquery)
+        try:
+            rfeed = self.service.GetCellsFeed(key=self.document_key,
+                                              wksht_id=self.sheet_id,
+                                              query=cellquery)
+        except Exception, e:
+            gdata_log.error("gdata API error. %s", e)
+            raise e
 
         cells_list = []
         for cell_elem in rfeed.entry:
@@ -669,10 +751,16 @@ class Sheet(object):
         """
 
         folder = self._find_or_create_folder(folder_key, folder_name)
-        source_rsrc = self.docs_client.get_resource_by_id(self.document_key)
+        try:
+            source_rsrc = self.docs_client.get_resource_by_id(self.document_key)
+        except Exception, e:
+            gdata_log.error("gdata API error. %s", e)
+            raise e
+
         backup = self._create_new_or_copy(source_doc=source_rsrc, 
                                         target_name=backup_name, 
-                                        folder=folder)
+                                        folder=folder,
+                                        sheet_description="backup")
 
         backup_key = backup.GetId().rsplit('%3A',1)[1]
         return backup_key
@@ -802,14 +890,11 @@ class Sheet(object):
                         different_fields.append(header)
 
                 if different_fields:
-                    if row_change_callback:
-                        # We expose a callback function in case the driving script needs
-                        # to do anything else when fields on the spreadsheet change.
-                        row_change_callback(key_tuple, wks_row.db, raw_row, different_fields)
                     if self._change_row(key_tuple, 
                                         wks_row, 
                                         raw_row, 
-                                        different_fields):
+                                        different_fields,
+                                        row_change_callback):
                         results.changed += 1
                 else:
                     results.nochange += 1
@@ -933,7 +1018,9 @@ class Sheet(object):
         self.max_row += 1
 
  
-    def _change_row(self, key_tuple, wks_row, raw_row, different_fields):
+    def _change_row(self, key_tuple, wks_row, 
+                    raw_row, different_fields,
+                    row_change_callback):
 
         changed_fields = []
         for row, col, cell_elem in wks_row.cell_list():
@@ -953,5 +1040,8 @@ class Sheet(object):
                 changed_fields.append(header)
                 self._log_change(key_tuple, ("Updated %s" % header), 
                                  old_val=sheet_val, new_val=raw_val)
+
+        if row_change_callback:
+            row_change_callback(key_tuple, wks_row.db, raw_row, changed_fields)
 
         return changed_fields
