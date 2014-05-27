@@ -6,19 +6,23 @@ A python library to synchronize rows of data with a google spreadsheet.
 break, bad things could happen. View the code and issues on `github
 <http://github.com/mbrenig/SheetSync>`_. 
 
-Installing
-----------
-Install **SheetSync** with::
+Installation
+------------
 
-  $ pip install sheetsync
+Install from PyPi using `pip <http://www.pip-installer.org/en/latest/>`__, a
+package manager for Python.::
 
-Or for the bleeding edge of development, clone the repo and install::
+  pip install sheetsync
 
-  $ git clone git@github.com:mbrenig/SheetSync.git SheetSyncRepo
-  $ pip install SheetSyncRepo
+Or to develop this library further, you can clone the git repo and install::
 
-Basic usage
------------
+  git clone git@github.com:mbrenig/SheetSync.git SheetSyncRepo
+  pip install SheetSyncRepo
+
+Note, you may need to run the commands above with ``sudo``.
+
+Getting Started
+---------------
 SheetSync works with data in a dictionary of dictionaries. Each row is
 represented by a dictionary, and these are themselves stored in a dictionary
 indexed by a row-specific key. For example:
@@ -41,6 +45,7 @@ sheet in a google spreadsheet document you do this:
                              document_name="Let's try out SheetSync")
     # Add data to the spreadsheet...
     target.sync(data)
+    print "Review the new spreadsheet created here: %s" % target.document_href
 
 This creates a new spreadsheet document in your google drive and then inserts the data.
 
