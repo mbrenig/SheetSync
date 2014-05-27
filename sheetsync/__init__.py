@@ -713,15 +713,16 @@ class Sheet(object):
         for key_field in self.key_column_headers:
             if key_field not in self.header:
                 headers_to_add.append(key_field)
-        for header in required_headers:
+
+        # Write new headers in alphabetical order.
+        sorted_required_headers = list(required_headers)
+        sorted_required_headers.sort()
+        for header in sorted_required_headers:
             if header not in self.header:
                 headers_to_add.append(header)
 
         if not headers_to_add:
             return 
-
-        # Write new headers in alphabetical order.
-        headers_to_add.sort()
 
         target_cols = self.header.last_column + len(headers_to_add)
         self._extends(columns=target_cols)
