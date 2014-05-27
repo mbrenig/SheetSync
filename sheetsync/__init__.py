@@ -195,9 +195,10 @@ class Sheet(object):
     Attributes:
         document_key: The key of the spreadsheet. If you are relying on
           sheetsync to automatically create a spreadsheet then use this
-          attribute to access the document_key
-        service: The connected instance of the gdata SpreadsheetService. Use at
-          your own risk!
+          attribute to access the document_key.. and make sure you pass 
+          it as a parameter in subsequent calls to __init__
+        document_name: The title of the google spreadsheet document
+        document_href: The HTML href for the google spreadsheet document
     """
 
     # Global _pool object holds mapping to google connections. 
@@ -337,6 +338,8 @@ class Sheet(object):
   
         # Create attribute for document key
         self.document_key = document.GetId().split('%3A')[1]
+        self.document_name = document.title.text
+        self.document_href = document.get_html_link().href
 
         # Find or create the worksheet
         if sheet_name is None:
@@ -717,6 +720,9 @@ class Sheet(object):
         if not headers_to_add:
             return 
 
+        # Write new headers in alphabetical order.
+        headers_to_add.sort()
+
         target_cols = self.header.last_column + len(headers_to_add)
         self._extends(columns=target_cols)
 
@@ -921,7 +927,8 @@ class Sheet(object):
                         logger.debug("Flagging row %s for deletion (key %s)", 
                                                    wks_row.row_num, key_tuple)
                         if row_change_callback:
-                            row_change_callback(key_tuple, wks_row.db, None, [])
+                            row_change_callback(key_tuple, wks_row.db, 
+                                        None, self.key_column_headers[:])
                         self._delete_flag_row(key_tuple, wks_row)
                         results.deleted += 1
                 else:
@@ -929,7 +936,8 @@ class Sheet(object):
                     logger.debug("Deleting row: %s for key %s", 
                                                     wks_row.row_num, key_tuple)
                     if row_change_callback:
-                        row_change_callback(key_tuple, wks_row.db, None, [])
+                        row_change_callback(key_tuple, wks_row.db, 
+                                            None, wks_row.db.keys())
                     self._log_change(key_tuple, "Deleted entry.")
                     self._delete_row(key_tuple, wks_row)
                     results.deleted += 1
@@ -952,7 +960,8 @@ class Sheet(object):
                 raw_row = fixed_data[key_tuple]
                 results.added += 1
                 if row_change_callback:
-                    row_change_callback(key_tuple, None, raw_row, [])
+                    row_change_callback(key_tuple, None, 
+                                        raw_row, raw_row.keys())
                 self._insert_row(key_tuple, wks_row, raw_row)
 
         self._flush_writes()
