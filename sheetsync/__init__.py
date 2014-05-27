@@ -808,6 +808,20 @@ class Sheet(object):
         indexed_sheet_data = {}
         for row, wks_row in sheet_data.iteritems():
             # Make the key tuple
+            if len(self.key_column_headers) == 0:
+                # Are there any default key column headers?
+                if "Key" in wks_row:
+                    logger.info("Assumed key column's header is 'Key'")
+                    self.key_column_headers = ['Key']
+                elif "Key-1" in wks_row:
+                    self.key_column_headers = [h for h in wks_row.keys() 
+                        if h.startswith("Key-") and h.split("-")[1].isdigit()]
+                    logger.info("Assumed key column headers were: %s",
+                                self.key_column_headers)
+                else:
+                    raise Exception("Unable to read spreadsheet. Specify"
+                        "key_column_headers when initializing Sheet object.")
+
             key_list = []
             for key_hdr in self.key_column_headers:
                 key_val = wks_row.db.get(key_hdr,"")

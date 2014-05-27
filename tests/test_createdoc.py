@@ -93,6 +93,14 @@ def test_the_kartik_test():
     assert retrieved_data["2"]["color"] == "Blue"
     assert retrieved_data["2"]["Key"] == "2"
 
+    # Try opening the doc with a new instance (thereby guessing key columns)
+    test_read = sheetsync.Sheet(GOOGLE_U, GOOGLE_P,
+                                document_name = new_doc_name)
+    retrieved_data_2 = test_read.data()
+    assert "1" in retrieved_data_2
+    assert "2" in retrieved_data_2
+    assert retrieved_data["2"]["color"] == "Blue"
+
     # Delete the doc
     gdc = target._doc_client_pool[GOOGLE_U]
     target_rsrc = gdc.get_resource_by_id(target.document_key)
