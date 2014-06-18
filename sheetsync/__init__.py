@@ -446,14 +446,14 @@ class Sheet(object):
                                                folder, 
                                                keep_in_collections=False)
             except Exception, e:
-                gdata_log("gdata API error. %s", e)
+                gdata_log.error("gdata API error. %s", e)
                 raise e
 
             try:
                 self.docs_client.Delete(ROOT_FOLDER_URL + self.new_document.resource_id.text, 
                                     force=True)
             except Exception, e:
-                gdata_log("gdata API error. %s", e)
+                gdata_log.error("gdata API error. %s", e)
                 raise e
 
             logger.info("Moved resource to folder.")
@@ -508,7 +508,7 @@ class Sheet(object):
             try:
                 doc_rsrc = self.docs_client.get_resource_by_id(doc_key)
             except Exception, e:
-                gdata_log("gdata API error. %s", e)
+                gdata_log.error("gdata API error. %s", e)
                 raise e
 
             if doc_rsrc is None:

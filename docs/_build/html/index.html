@@ -44,22 +44,22 @@
   <div class="section" id="welcome-to-sheetsync">
 <h1>Welcome to SheetSync!<a class="headerlink" href="#welcome-to-sheetsync" title="Permalink to this headline">¶</a></h1>
 <p>A python library to synchronize rows of data with a google spreadsheet.</p>
-<p><strong>WARNING!</strong> This library is in a hidden development phase. APIs might change, function might
-break, bad things could happen. View the code and issues on <a class="reference external" href="http://github.com/mbrenig/SheetSync">github</a>.</p>
-<div class="section" id="installing">
-<h2>Installing<a class="headerlink" href="#installing" title="Permalink to this headline">¶</a></h2>
-<p>Install <strong>SheetSync</strong> with:</p>
-<div class="highlight-python"><div class="highlight"><pre>$ pip install sheetsync
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>Install from PyPi using <a class="reference external" href="http://www.pip-installer.org/en/latest/">pip</a>, a
+package manager for Python.:</p>
+<div class="highlight-python"><div class="highlight"><pre>pip install sheetsync
 </pre></div>
 </div>
-<p>Or for the bleeding edge of development, clone the repo and install:</p>
-<div class="highlight-python"><div class="highlight"><pre>$ git clone git@github.com:mbrenig/SheetSync.git SheetSyncRepo
-$ pip install SheetSyncRepo
+<p>Or to develop this library further, you can clone the git repo and install:</p>
+<div class="highlight-python"><div class="highlight"><pre>git clone git@github.com:mbrenig/SheetSync.git SheetSyncRepo
+pip install SheetSyncRepo
 </pre></div>
 </div>
+<p>Note, you may need to run the commands above with <tt class="docutils literal"><span class="pre">sudo</span></tt>.</p>
 </div>
-<div class="section" id="basic-usage">
-<h2>Basic usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="getting-started">
+<h2>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h2>
 <p>SheetSync works with data in a dictionary of dictionaries. Each row is
 represented by a dictionary, and these are themselves stored in a dictionary
 indexed by a row-specific key. For example:</p>
@@ -68,54 +68,159 @@ indexed by a row-specific key. For example:</p>
         <span class="p">}</span>
 </pre></div>
 </div>
-<p>To synchronize this data (insert, modify or delete rows) with a target
+<p>To insert this data (add or update rows) with a target
 sheet in a google spreadsheet document you do this:</p>
 <div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">sheetsync</span>
 <span class="c"># Get or create a spreadsheet...</span>
 <span class="n">target</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;googledriveuser@domain.com&quot;</span><span class="p">,</span>
                          <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
                          <span class="n">document_name</span><span class="o">=</span><span class="s">&quot;Let&#39;s try out SheetSync&quot;</span><span class="p">)</span>
-<span class="c"># Add data to the spreadsheet...</span>
-<span class="n">target</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="c"># Insert or update rows on the spreadsheet...</span>
+<span class="n">target</span><span class="o">.</span><span class="n">inject</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<span class="k">print</span> <span class="s">&quot;Review the new spreadsheet created here: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">target</span><span class="o">.</span><span class="n">document_href</span>
 </pre></div>
 </div>
-<p>This creates a new spreadsheet document in your google drive and then inserts the data.</p>
+<p>This creates a new spreadsheet document in your google drive and then inserts the data like so:</p>
+<img alt="_images/Sheet1.png" src="_images/Sheet1.png" />
+<p>Later on you&#8217;ll probably want to access this data, to do that note the
+spreadsheet&#8217;s document key from the URL:</p>
+<img alt="_images/URL.png" src="_images/URL.png" />
+<p>and access the data as follows:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">source</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;googledriveuser@domain.com&quot;</span><span class="p">,</span>
+                         <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
+                         <span class="n">document_key</span><span class="o">=</span><span class="s">&quot;1bnieREGAyXZ2TnhXgYrIacCIY09Q2lfGXNZbjsvJ82M&quot;</span><span class="p">)</span>
+<span class="k">print</span> <span class="n">source</span><span class="o">.</span><span class="n">data</span><span class="p">()</span>
+</pre></div>
 </div>
-<div class="section" id="advanced-topics">
-<h2>Advanced topics<a class="headerlink" href="#advanced-topics" title="Permalink to this headline">¶</a></h2>
-<dl class="docutils">
-<dt>TODO: Will cover:</dt>
-<dd><ul class="first last simple">
-<li>document_key instead of name</li>
-<li>folder key</li>
-<li>template key</li>
-<li>header index</li>
-<li>formula ref</li>
-</ul>
-</dd>
-</dl>
+<p>The &#8216;inject&#8217; method only adds or updates rows. If you want to delete rows from the spreadsheet to keep it in sync with the input data then use the &#8216;sync&#8217; method described in the &#8216;Synchronizing data&#8217; section below.</p>
 </div>
-<div class="section" id="the-deleted-flag-and-backups">
-<h2>The (DELETED) flag and backups<a class="headerlink" href="#the-deleted-flag-and-backups" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="getting-silly">
+<h2>Getting Silly<a class="headerlink" href="#getting-silly" title="Permalink to this headline">¶</a></h2>
+<p>Let&#8217;s extend this example, and use more of SheetSync&#8217;s features. (With apologies
+in advance to the Muppets involved).</p>
+<div class="section" id="key-column-headers">
+<h3>Key Column Headers<a class="headerlink" href="#key-column-headers" title="Permalink to this headline">¶</a></h3>
+<p>The first thing we&#8217;ll fix is that top-left cell with the value &#8216;Key&#8217;. The keys
+for our data are Names and the column header should reflect that. This is easy
+enough to do with the key_column_headers field:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">target</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;googledriveuser@domain.com&quot;</span><span class="p">,</span>
+                         <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
+                         <span class="n">document_name</span><span class="o">=</span><span class="s">&quot;Muppet Show Tonight&quot;</span><span class="p">,</span>
+                         <span class="n">key_column_headers</span><span class="o">=</span><span class="p">[</span><span class="s">&quot;Name&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="templates-for-formatting">
+<h3>Templates for Formatting<a class="headerlink" href="#templates-for-formatting" title="Permalink to this headline">¶</a></h3>
+<p>Google&#8217;s spreadsheet API doesn&#8217;t currently allow control over
+cell formatting, but you can specify a template template spreadsheet that has the
+formatting you want - and use SheetSync to add data to a copy of the template.
+Here&#8217;s a template spreadsheet created to keep my list of Muppets:</p>
+<img alt="_images/Template01.png" src="_images/Template01.png" />
+<p><a class="reference external" href="https://docs.google.com/spreadsheets/d/1J__SpvQvI9S4bW-BkA0PmPykH8VVT9bdoWZ-AW7V_0U/edit#gid=0">https://docs.google.com/spreadsheets/d/1J__SpvQvI9S4bW-BkA0PmPykH8VVT9bdoWZ-AW7V_0U/edit#gid=0</a></p>
+<p>The template&#8217;s document key is &#8216;1J__SpvQvI9S4bW-BkA0PmPykH8VVT9bdoWZ-AW7V_0U&#8217; we can instruct
+SheetSync to use this as a basis for the new spreadsheet it creates as follows:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">target</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;googledriveuser@domain.com&quot;</span><span class="p">,</span>
+                         <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
+                         <span class="n">document_name</span><span class="o">=</span><span class="s">&quot;Muppet Show Tonight&quot;</span><span class="p">,</span>
+                         <span class="n">sheet_name</span><span class="o">=</span><span class="s">&quot;Muppets&quot;</span><span class="p">,</span>
+                         <span class="n">template_key</span><span class="o">=</span><span class="s">&quot;1J__SpvQvI9S4bW-BkA0PmPykH8VVT9bdoWZ-AW7V_0U&quot;</span><span class="p">,</span>
+                         <span class="n">key_column_headers</span><span class="o">=</span><span class="p">[</span><span class="s">&quot;Name&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>Note that I&#8217;ve also specified the worksheet name in that example with the
+&#8216;sheet_name&#8217; parameter.</p>
+</div>
+<div class="section" id="folders">
+<h3>Folders<a class="headerlink" href="#folders" title="Permalink to this headline">¶</a></h3>
+<p>If you use folders to organize your Google drive, you can specify the folder a
+new spreadsheet will be created in. Use either the &#8216;folder_name&#8217; or &#8216;folder_key&#8217; parameters.
+Here for example I have a folder with the key &#8220;0B8rRHMfAlOZrWUw4LUhZejk4c0E&#8221;:</p>
+<img alt="_images/FolderURL.png" src="_images/FolderURL.png" />
+<p>and instruct SheetSync to move the new spreadsheet into that folder with this
+code:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">target</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;googledriveuser@domain.com&quot;</span><span class="p">,</span>
+                         <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
+                         <span class="n">document_name</span><span class="o">=</span><span class="s">&quot;Muppet Show Tonight&quot;</span><span class="p">,</span>
+                         <span class="n">sheet_name</span><span class="o">=</span><span class="s">&quot;Muppets&quot;</span><span class="p">,</span>
+                         <span class="n">key_column_headers</span><span class="o">=</span><span class="p">[</span><span class="s">&quot;Name&quot;</span><span class="p">],</span>
+                         <span class="n">template_key</span><span class="o">=</span><span class="s">&quot;1J__SpvQvI9S4bW-BkA0PmPykH8VVT9bdoWZ-AW7V_0U&quot;</span><span class="p">,</span>
+                         <span class="n">folder_key</span><span class="o">=</span><span class="s">&quot;0B8rRHMfAlOZrWUw4LUhZejk4c0E&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="formulas">
+<h3>Formulas<a class="headerlink" href="#formulas" title="Permalink to this headline">¶</a></h3>
+<p>Often you&#8217;ll need some columns to contain formulas that depend on data in other columns, and when new rows are inserted by SheetSync, ideally you&#8217;d want those formulas to be added too.
+When initializing the spreadsheet you can specify a row (typically above the
+header row) that contains reference formulas. Best illustrated by this example</p>
+<img alt="_images/MuppetsFormulas.png" src="_images/MuppetsFormulas.png" />
+<p><a class="reference external" href="https://docs.google.com/spreadsheets/d/1tn-lGqGHDrVbnW2PRvwie4LMmC9ZgYHWlbyTjCvwru8/edit#gid=0">https://docs.google.com/spreadsheets/d/1tn-lGqGHDrVbnW2PRvwie4LMmC9ZgYHWlbyTjCvwru8/edit#gid=0</a></p>
+<p>Here row 2 contains formulas (Written out in row 1 for readability) that
+reference hidden columns. Row 3 contains the headers.</p>
+<p>When new rows are added to this spreadsheet the &#8216;Photo&#8217; and &#8216;Muppet&#8217; columns will be populated with a formula similar to the reference row. Here are the parameters to set this up:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">target</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;googledriveuser@domain.com&quot;</span><span class="p">,</span>
+                         <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
+                         <span class="n">document_key</span><span class="o">=</span><span class="s">&quot;1tn-lGqGHDrVbnW2PRvwie4LMmC9ZgYHWlbyTjCvwru8&quot;</span><span class="p">,</span>
+                         <span class="n">sheet_name</span><span class="o">=</span><span class="s">&quot;Muppets&quot;</span><span class="p">,</span>
+                         <span class="n">key_column_headers</span><span class="o">=</span><span class="p">[</span><span class="s">&quot;Name&quot;</span><span class="p">],</span>
+                         <span class="n">header_row_ix</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+                         <span class="n">formula_ref_row_ix</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="n">animal</span> <span class="o">=</span>  <span class="p">{</span><span class="s">&#39;Animal&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s">&#39;Color&#39;</span><span class="p">:</span> <span class="s">&#39;Red&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;Image URL&#39;</span><span class="p">:</span> <span class="s">&#39;http://upload.wikimedia.org/wikipedia/en/e/e7/Animal_%28Muppet%29.jpg&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;Performer&#39;</span><span class="p">:</span> <span class="s">&#39;Frank Oz&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;Wikipedia&#39;</span><span class="p">:</span> <span class="s">&#39;http://en.wikipedia.org/wiki/Animal_(Muppet)&#39;</span><span class="p">}</span> <span class="p">}</span>
+
+<span class="n">target</span><span class="o">.</span><span class="n">inject</span><span class="p">(</span><span class="n">animal</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="synchronizing-data">
+<h3>Synchronizing data<a class="headerlink" href="#synchronizing-data" title="Permalink to this headline">¶</a></h3>
+<p>Until now all examples have shown injecting data into a spreadsheet ot add or
+update rows. As the name suggests, SheetSync also has a &#8216;sync&#8217; method which
+will make sure the rows in the spreadsheet match the rows passed to the
+function. This might require that rows are deleted from the spreadsheet.</p>
+<p>The default behavior is to not actually delete rows, but instead flag them for
+deletion with the &#8220;(DELETED)&#8221; being appended to the values of the Key columns.
+This is to help recovery from accidental deletions, but might not be desirable.
+Full row deletion can be enabled by passing the flag_deletes argument as
+follows:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">target</span> <span class="o">=</span> <span class="n">sheetsync</span><span class="o">.</span><span class="n">Sheet</span><span class="p">(</span><span class="n">username</span><span class="o">=</span><span class="s">&quot;googledriveuser@domain.com&quot;</span><span class="p">,</span>
+                         <span class="n">password</span><span class="o">=</span><span class="s">&quot;app-specific-password&quot;</span><span class="p">,</span>
+                         <span class="n">document_key</span><span class="o">=</span><span class="s">&quot;1J__SABCD1234bW-ABCD1234kH8VABCD1234-AW7V_0U&quot;</span><span class="p">,</span>
+                         <span class="n">sheet_name</span><span class="o">=</span><span class="s">&quot;Muppets&quot;</span><span class="p">,</span>
+                         <span class="n">key_column_headers</span><span class="o">=</span><span class="p">[</span><span class="s">&quot;Name&quot;</span><span class="p">],</span>
+                         <span class="n">flag_deletes</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+
+<span class="n">new_list</span> <span class="o">=</span> <span class="p">{</span> <span class="s">&#39;Kermit&#39;</span> <span class="p">:</span> <span class="p">{</span> <span class="s">&#39;Color&#39;</span> <span class="p">:</span> <span class="s">&#39;Green&#39;</span><span class="p">,</span>
+                          <span class="s">&#39;Performer&#39;</span> <span class="p">:</span> <span class="s">&#39;Jim Henson&#39;</span> <span class="p">},</span>
+             <span class="s">&#39;Fozzie Bear&#39;</span> <span class="p">:</span> <span class="p">{</span><span class="s">&#39;Color&#39;</span> <span class="p">:</span> <span class="s">&#39;Orange&#39;</span> <span class="p">}</span> <span class="p">}</span>
+
+<span class="n">target</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span> <span class="n">new_list</span> <span class="p">)</span>
+</pre></div>
+</div>
+<p>With rows for Miss Piggy and Kermit already in the spreadsheet, the sync
+function (in the example above) would remove Miss Piggy and add Fozzie Bear.</p>
+</div>
+</div>
+<div class="section" id="taking-backups">
+<h2>Taking backups<a class="headerlink" href="#taking-backups" title="Permalink to this headline">¶</a></h2>
 <p>Couldn&#8217;t the sync function delete all my rows? <strong>Yes it could!</strong></p>
-<p>You might have noticed by now that the default deletion behavior for
-the sync method is to append the values in Key fields with &#8220;(DELETED)&#8221; and not actually
-delete the rows. This is to avoid accidental bulk deletion while a new user
-experiments with the library. It can be turned off by passing the argument: &#8216;flag_deletes = False&#8217; into the sheetsync.Sheet constructor. In that case rows that need to be deleted
-from the target spreadsheet will be erased.</p>
-<p>Some mistakes cause very bad results. For instance, if the key column headers on the spreadsheet don&#8217;t match those passed to the Sheet constructor the sync method will delete all the existing rows and add new ones! You should mitigate the risks by taking backups of your spreadsheet before sync&#8217;ing data. Here&#8217;s an example:</p>
-<div class="highlight-python"><div class="highlight"><pre><span class="n">target</span><span class="o">.</span><span class="n">backup</span><span class="p">(</span><span class="s">&quot;Backup of my important sheet. 15th May&quot;</span><span class="p">,</span>
+<p>Some simple mistakes can cause bad results. For instance, if the key column headers on the spreadsheet don&#8217;t match those passed to the Sheet constructor the sync method will delete all the existing rows and add new ones! You could protect rows and ranges to guard against this, but perhaps the simplest way to mitigate the risk is by creating a backup of your spreadsheet before syncing data. Here&#8217;s an example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">target</span><span class="o">.</span><span class="n">backup</span><span class="p">(</span><span class="s">&quot;Backup of my important sheet. 16th June&quot;</span><span class="p">,</span>
               <span class="n">folder_name</span> <span class="o">=</span> <span class="s">&quot;SheetSync Backups.&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>This code would take a copy of the entire spreadsheet that the sheet &#8216;target&#8217;
-belongs to, name it &#8220;Backup of my important sheet. 15th May&#8221;, and move it to a
+<p>This code would take a copy of the entire spreadsheet that the Sheet instance &#8216;target&#8217;
+belongs to, name it &#8220;Backup of my important sheet. 16th June&#8221;, and move it to a
 folder named &#8220;SheetSync Backups.&#8221;.</p>
 </div>
 <div class="section" id="debugging">
 <h2>Debugging<a class="headerlink" href="#debugging" title="Permalink to this headline">¶</a></h2>
-<p>SheetSync uses the standard python logging module, the simplest way to find
-out what it&#8217;s doing under the covers is to turn on all logging:</p>
+<p>SheetSync uses the standard python logging module, the easiest way to find
+out what&#8217;s going on under the covers is to turn on all logging:</p>
 <div class="highlight-python"><div class="highlight"><pre><span class="kn">import</span> <span class="nn">sheetsync</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="c"># Set all loggers to DEBUG level..</span>
@@ -138,10 +243,17 @@ submit pull requests. Thanks!</p>
   <h3><a href="#">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Welcome to SheetSync!</a><ul>
-<li><a class="reference internal" href="#installing">Installing</a></li>
-<li><a class="reference internal" href="#basic-usage">Basic usage</a></li>
-<li><a class="reference internal" href="#advanced-topics">Advanced topics</a></li>
-<li><a class="reference internal" href="#the-deleted-flag-and-backups">The (DELETED) flag and backups</a></li>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#getting-started">Getting Started</a></li>
+<li><a class="reference internal" href="#getting-silly">Getting Silly</a><ul>
+<li><a class="reference internal" href="#key-column-headers">Key Column Headers</a></li>
+<li><a class="reference internal" href="#templates-for-formatting">Templates for Formatting</a></li>
+<li><a class="reference internal" href="#folders">Folders</a></li>
+<li><a class="reference internal" href="#formulas">Formulas</a></li>
+<li><a class="reference internal" href="#synchronizing-data">Synchronizing data</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#taking-backups">Taking backups</a></li>
 <li><a class="reference internal" href="#debugging">Debugging</a></li>
 </ul>
 </li>

@@ -3,13 +3,11 @@ SheetSync
 
 |Build Status|
 
-A Python library for creating and updating spreadsheets that contain rows of
-data. `Click here to read the full documentation.
+A python library to create, update and delete rows of data within a google spreadsheet. `Click here to read the full documentation.
 <http://sheetsync.readthedocs.org/>`__
 
 Installation
 ------------
-
 Install from PyPi using `pip <http://www.pip-installer.org/en/latest/>`__, a
 package manager for Python.::
 
@@ -22,9 +20,9 @@ Or to develop this library further, you can clone the git repo and install::
 
 Note, you may need to run the commands above with ``sudo``.
 
+
 Getting Started
 ---------------
-
 SheetSync works with data in a dictionary of dictionaries. Each row is
 represented by a dictionary, and these are themselves stored in a dictionary
 indexed by a row-specific key. For example:
@@ -35,7 +33,7 @@ indexed by a row-specific key. For example:
              "Miss Piggy" : {"Color" : "Pink", "Performer" : "Frank Oz"}
             }
 
-To synchronize this data (insert, modify or delete rows) with a target
+To insert this data (add or update rows) with a target
 sheet in a google spreadsheet document you do this:
 
 .. code-block:: python
@@ -45,11 +43,30 @@ sheet in a google spreadsheet document you do this:
     target = sheetsync.Sheet(username="googledriveuser@domain.com", 
                              password="app-specific-password",
                              document_name="Let's try out SheetSync")
-    # Add data to the spreadsheet...
-    target.sync(data)
+    # Insert or update rows on the spreadsheet...
+    target.inject(data)
     print "Review the new spreadsheet created here: %s" % target.document_href
 
-This creates a new spreadsheet document in your google drive and then inserts the data.
+This creates a new spreadsheet document in your google drive and then inserts the data like so:
+
+.. image:: Sheet1.png
+
+Later on you'll probably want to access this data, to do that note the
+spreadsheet's document key from the URL:
+
+.. image:: URL.png
+
+and access the data as follows:
+
+.. code-block:: python
+
+    source = sheetsync.Sheet(username="googledriveuser@domain.com",
+                             password="app-specific-password",
+                             document_key="1bnieREGAyXZ2TnhXgYrIacCIY09Q2lfGXNZbjsvJ82M")
+    print source.data()
+
+The 'inject' method only adds or updates rows. If you want to delete rows from the spreadsheet to keep it in sync with the input data then use the 'sync' method described in the 'Synchronizing data' section below.
+
 
 Debugging 
 ~~~~~~~~~
@@ -71,14 +88,12 @@ submit pull requests. Thanks!
 
 Digging Deeper
 ~~~~~~~~~~~~~~
+The `full documentation <http://sheetsync.readthedocs.org/>`__ covers extra features such as:
 
-The `full documentation <http://sheetsync.readthedocs.org/>`__
-is in the process of being written but will soon cover features such as:
-
--  `Using templates to create new spreadsheets <http://sheetsync.readthedocs.org>`__
+-  `Using templates when creating new spreadsheets <http://sheetsync.readthedocs.org>`__
 -  `Using a row for formula references <http://sheetsync.readthedocs.org>`__
--  `The on_change_callback function <http://sheetsync.readthedocs.org>`__
--  `Live examples <http://sheetsync.readthedocs.org>`__
+-  `The on_change_callback function [TODO]<http://sheetsync.readthedocs.org>`__
+-  `Live examples [TODO]<http://sheetsync.readthedocs.org>`__
 
 
 .. |Build Status| image:: https://travis-ci.org/mbrenig/SheetSync.svg?branch=master
