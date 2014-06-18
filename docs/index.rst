@@ -85,7 +85,7 @@ enough to do with the key_column_headers field:
 Templates for Formatting
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Google's spreadsheet API doesn't currently allow control over 
-cell formatting, but you can specify a template template spreadsheet that has the 
+cell formatting, but you can specify a template spreadsheet that has the 
 formatting you want - and use SheetSync to add data to a copy of the template.
 Here's a template spreadsheet created to keep my list of Muppets:
 
