@@ -49,12 +49,12 @@ sheet in a google spreadsheet document you do this:
 
 This creates a new spreadsheet document in your google drive and then inserts the data like so:
 
-.. image:: Sheet1.png
+.. image:: https://raw.githubusercontent.com/mbrenig/SheetSync/master/docs/Sheet1.png
 
 Later on you'll probably want to access this data, to do that note the
 spreadsheet's document key from the URL:
 
-.. image:: URL.png
+.. image:: https://raw.githubusercontent.com/mbrenig/SheetSync/master/docs/URL.png
 
 and access the data as follows:
 
