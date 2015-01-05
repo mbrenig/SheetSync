@@ -36,7 +36,9 @@ oldpp = gdata.service.GDataService.PostOrPut
 def newpp(self, verb, *args, **kw):
     if verb == 'PUT' or (verb == 'POST' and 
             type(args[0]).__name__ != 'SpreadsheetsWorksheet'):
-        if not kw.get('extra_headers'):
+        if len(args) >= 3 and isinstance(args[2], dict):
+            args[2]['If-Match'] = '*'
+        elif not kw.get('extra_headers'):
             kw['extra_headers'] = { 'If-Match': '*' }
         else:
             kw['extra_headers']['If-Match'] = '*'
@@ -47,7 +49,7 @@ gdata.service.GDataService.PostOrPut = newpp
 
 import gdata.spreadsheet.service, gdata.spreadsheet, gdata.docs.client
 
-MAX_BATCH_LEN = 40960   # Google's limit is 1MB or 1000 batch entries.
+MAX_BATCH_LEN = 409600   # Google's limit is 1MB or 1000 batch entries.
 DELETE_ME_FLAG = ' (DELETED)'
 DEFAULT_SHEET_NAME = 'Sheet1'
 SOURCE_STRING = ('sheetsync.py version:%s' % __version__)
@@ -422,7 +424,7 @@ class Sheet(object):
                 self.new_document = self.docs_client.copy_resource(source_doc,
                                                             title=target_name)
             except Exception, e:
-                gdata_log.error("gdata API error. %s", e)
+                gdata_log.exception("gdata API error. %s", e)
                 raise e
 
         else:
@@ -433,7 +435,7 @@ class Sheet(object):
             try:
                 self.new_document = self.docs_client.create_resource(rsrc)
             except Exception, e:
-                gdata_log.error("gdata API error. %s", e)
+                gdata_log.exception("gdata API error. %s", e)
                 raise e
 
         logger.info("Created %s spreadsheet with Id: %s", 
@@ -446,14 +448,14 @@ class Sheet(object):
                                                folder, 
                                                keep_in_collections=False)
             except Exception, e:
-                gdata_log.error("gdata API error. %s", e)
+                gdata_log.exception("gdata API error. %s", e)
                 raise e
 
             try:
                 self.docs_client.Delete(ROOT_FOLDER_URL + self.new_document.resource_id.text, 
                                     force=True)
             except Exception, e:
-                gdata_log.error("gdata API error. %s", e)
+                gdata_log.exception("gdata API error. %s", e)
                 raise e
 
             logger.info("Moved resource to folder.")
@@ -465,7 +467,7 @@ class Sheet(object):
             try:
                 folder_rsrc = self.docs_client.get_resource_by_id(folder_key)
             except Exception, e:
-                gdata_log.error("gdata API error. %s", e)
+                gdata_log.exception("gdata API error. %s", e)
                 raise e
 
             if folder_rsrc is None:
@@ -481,7 +483,7 @@ class Sheet(object):
         try:
             matches = self.docs_client.GetResources(q=name_query)
         except Exception, e:
-            gdata_log.error("gdata API error. %s", e)
+            gdata_log.exception("gdata API error. %s", e)
             raise e
 
         for doc_rsrc in matches.entry:
@@ -494,7 +496,7 @@ class Sheet(object):
         try:
             new_folder_rsrc = self.docs_client.create_resource(new_folder_rsrc)
         except Exception, e:
-            gdata_log.error("gdata API error. %s", e)
+            gdata_log.exception("gdata API error. %s", e)
             raise e
 
         return new_folder_rsrc
@@ -508,7 +510,7 @@ class Sheet(object):
             try:
                 doc_rsrc = self.docs_client.get_resource_by_id(doc_key)
             except Exception, e:
-                gdata_log.error("gdata API error. %s", e)
+                gdata_log.exception("gdata API error. %s", e)
                 raise e
 
             if doc_rsrc is None:
@@ -523,7 +525,7 @@ class Sheet(object):
         try:
             matches = self.docs_client.GetResources(q=name_query)
         except Exception, e:
-            gdata_log.error("gdata API error. %s", e)
+            gdata_log.exception("gdata API error. %s", e)
             raise e
 
         if len(matches.entry) == 1:
@@ -544,7 +546,7 @@ class Sheet(object):
         try:
             wks_feed = self.service.GetWorksheetsFeed(self.document_key, query=docquery)
         except Exception, e:
-            gdata_log.error("gdata API error. %s", e)
+            gdata_log.exception("gdata API error. %s", e)
             raise e
 
         for entry in wks_feed.entry:
@@ -558,7 +560,7 @@ class Sheet(object):
             new_sheet = self.service.AddWorksheet(sheet_name, '20', '10',
                                                   self.document_key)
         except Exception, e:
-            gdata_log.error("gdata API error. %s", e)
+            gdata_log.exception("gdata API error. %s", e)
             raise e
 
         if new_sheet is not None:
@@ -587,7 +589,7 @@ class Sheet(object):
                 self.sheet_obj = self.service.GetWorksheetsFeed(self.document_key, 
                                                   wksht_id=self.sheet_id)
             except Exception, e:
-                gdata_log.error("gdata API error. %s", e)
+                gdata_log.exception("gdata API error. %s", e)
                 raise e
 
             if update_cols:
@@ -599,7 +601,7 @@ class Sheet(object):
             try:
                 self.sheet_obj = self.service.UpdateWorksheet(self.sheet_obj)
             except Exception, e:
-                gdata_log.error("gdata API error. %s", e)
+                gdata_log.exception("gdata API error. %s", e)
                 raise e
 
             self.sheet_number_total_rows = int(self.sheet_obj.row_count.text)
@@ -629,7 +631,7 @@ class Sheet(object):
                 resp = self.service.ExecuteBatch(self._batch_request, 
                                                  self._batch_href)
             except Exception, e:
-                gdata_log.error("gdata API error. %s", e)
+                gdata_log.exception("gdata API error. %s", e)
                 raise e
 
             # Now check the response code. 
@@ -679,7 +681,7 @@ class Sheet(object):
                                               wksht_id=self.sheet_id,
                                               query=cellquery)
         except Exception, e:
-            gdata_log.error("gdata API error. %s", e)
+            gdata_log.exception("gdata API error. %s", e)
             raise e
 
         cells_list = []
@@ -761,7 +763,7 @@ class Sheet(object):
         try:
             source_rsrc = self.docs_client.get_resource_by_id(self.document_key)
         except Exception, e:
-            gdata_log.error("gdata API error. %s", e)
+            gdata_log.exception("gdata API error. %s", e)
             raise e
 
         backup = self._create_new_or_copy(source_doc=source_rsrc, 
@@ -993,7 +995,7 @@ class Sheet(object):
         for row, col, cell_elem in wks_row.cell_list():
             if self.header.col_lookup(col) in self.key_column_headers:
                 # Append the DELETE_ME_FLAG
-                cell_elem.cell.inputValue = cell_elem.cell.text+DELETE_ME_FLAG
+                cell_elem.cell.inputValue = "%s%s" % (cell_elem.cell.text,DELETE_ME_FLAG)
                 self._write_cell(cell_elem)
 
         self._log_change(key_tuple, "Deleted entry")
