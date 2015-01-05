@@ -10,7 +10,7 @@ with open('requirements.txt') as fh:
     requirements = [line.strip() for line in fh.readlines()]
 
 setup(
-    name='SheetSync',
+    name='sheetsync',
     version=__version__,
     description="Synchronize rows of data with a google spreadsheet",
     long_description=long_description,
