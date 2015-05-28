@@ -13,47 +13,106 @@
     :license: MIT, see LICENSE.txt for more details.
 """
 
+#----------MONKEY PATCH---------------------------------------------------
+import ssl
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    # Legacy Python that doesn't verify HTTPS certificates by default
+    pass
+else:
+    # Handle target environment that doesn't support HTTPS verification
+    ssl._create_default_https_context = _create_unverified_https_context
+#-----------END MONKEY PATCH----------------------------------------------
+
 from version import __version__
 
 import logging
+import httplib2 # pip install httplib2
 from datetime import datetime
+import json
 
-logger = logging.getLogger('sheetsync')
+# import latest google api python client.
+import apiclient.errors # pip install --upgrade google-api-python-client
+import apiclient.discovery 
+from oauth2client.client import OAuth2WebServerFlow, OAuth2Credentials, AccessTokenRefreshError
+
+# import the excellent gspread library.
+import gspread # pip install --upgrade gspread
+from gspread import SpreadsheetNotFound, WorksheetNotFound
+
+import dateutil.parser # pip install python-dateutil
+
+logger = logging.getLogger('sheetsync')         # XXX: Refactor.. just one logger should be fine!
 change_log = logging.getLogger('sheetsync.change')
-gdata_log = logging.getLogger('gdata')
+g_api_log = logging.getLogger('g_api')
 
-import dateutil.parser 
-
-# BEGIN MONKEY PATCH! 
-# This works around a gdata issue with the 'new-style' google sheets.
-# Specifically working around this issue: 
-#     https://code.google.com/p/gdata-python-client/issues/detail?id=692
-# The work-around is crude and increases the risk of overwriting 
-# values entered while the 'sync' function is processing.
-# Once api and gdata are fixed this should be removed.
-import gdata.service
-oldpp = gdata.service.GDataService.PostOrPut
-def newpp(self, verb, *args, **kw):
-    if verb == 'PUT' or (verb == 'POST' and 
-            type(args[0]).__name__ != 'SpreadsheetsWorksheet'):
-        if len(args) >= 3 and isinstance(args[2], dict):
-            args[2]['If-Match'] = '*'
-        elif not kw.get('extra_headers'):
-            kw['extra_headers'] = { 'If-Match': '*' }
-        else:
-            kw['extra_headers']['If-Match'] = '*'
-    return oldpp(self, verb, *args, **kw)
-gdata.service.GDataService.PostOrPut = newpp
-# END MONKEY PATCH!
-
-
-import gdata.spreadsheet.service, gdata.spreadsheet, gdata.docs.client
-
-MAX_BATCH_LEN = 409600   # Google's limit is 1MB or 1000 batch entries.
+MAX_BATCH_LEN = 50   # Google's limit is 1MB or 1000 batch entries. # XXX: REFACTOR?
 DELETE_ME_FLAG = ' (DELETED)'
-DEFAULT_SHEET_NAME = 'Sheet1'
-SOURCE_STRING = ('sheetsync.py version:%s' % __version__)
-ROOT_FOLDER_URL = 'https://docs.google.com/feeds/default/private/full/folder%3Aroot/contents/' 
+DEFAULT_WORKSHEET_NAME = 'Sheet1'
+
+def ia_credentials_helper(client_id, client_secret, 
+                          credentials_cache_file="credentials.json",
+                          cache_key="default"):
+    """Helper function to manage a credentials cache during testing.
+    
+    Args:
+      client_id (str): A Google Drive API client id string for an installed app
+      client_secret (str): The corresponding client secret.
+      credentials_cache_file (str): Filepath to the json credentials cache file
+      cache_key (str): Optional string to allow multiple credentials for a client
+                       to be stored in the cache.
+    Returns:
+      credentials (OAuth2Credentials): A google api credentials object.
+
+    This function will attempt to load and refresh a credentials object from a
+    json cache file.
+    """
+    def _load_credentials(key):
+        with open(credentials_cache_file, 'rb') as inf:
+            cache = json.load(inf)
+        cred_json = cache[key]
+        return OAuth2Credentials.from_json(cred_json)
+
+    def _save_credentials(key, credentials):
+        cache = {}
+        try:
+            with open(credentials_cache_file, 'rb') as inf:
+                cache = json.load(inf)
+        except (IOError, ValueError), e:
+            pass
+        cache[key] = credentials.to_json()
+        with open(credentials_cache_file, 'wb') as ouf:
+            json.dump(cache, ouf)
+
+    credentials_key = "%s/%s/%s" % (client_id, client_secret, cache_key)
+    try:
+        credentials = _load_credentials(credentials_key)
+        if credentials.access_token_expired:
+            http = httplib2.Http()
+            credentials.refresh(http)
+    except (IOError, 
+            ValueError, 
+            KeyError, 
+            AccessTokenRefreshError), e:
+        # Check https://developers.google.com/drive/scopes for all available scopes
+        OAUTH_SCOPE = ('https://www.googleapis.com/auth/drive '+
+                       'https://spreadsheets.google.com/feeds')
+        # Redirect URI for installed apps
+        REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
+
+        # Run through the OAuth flow and retrieve credentials
+        flow = OAuth2WebServerFlow(client_id, client_secret, OAUTH_SCOPE,
+                                   redirect_uri=REDIRECT_URI)
+        authorize_url = flow.step1_get_authorize_url()
+        print('Go to the following link in your browser:\n' + authorize_url)
+        code = raw_input('Enter verification code: ').strip()
+        credentials = flow.step2_exchange(code)
+
+    _save_credentials(credentials_key, credentials)
+    return credentials
+
+
 
 def _is_google_fmt_date(text):
     frags = text.split('/')
@@ -73,11 +132,25 @@ def google_equivalent(text1, text2):
     # Google spreadsheets modify some characters, and anything that looks like
     # a date. So this function will return true if text1 would equal text2 if 
     # both were input into a google cell.
-    text1 = text1.replace('\r',' ').replace('\t',' ')
-    text2 = text2.replace('\r',' ').replace('\t',' ')
-    if text1 == text2:
+    lines1 = [l.replace('\t',' ').strip() for l in text1.splitlines()]
+    lines2 = [l.replace('\t',' ').strip() for l in text2.splitlines()]
+    if len(lines1) != len(lines2):
+        return False
+    if len(lines1) == 0 and len(lines2) == 0:
         return True
+    if len(lines1) > 1:
+        for a,b in zip(lines1, lines2):
+            if a != b:
+                return False
+        # Multiline string matches on every line.
+        return True
+    elif lines1[0] == lines2[0]:
+        # Single line string.. that matches.
+        return True
+
     # Might be dates.
+    text1 = lines1[0]
+    text2 = lines2[0]
     if _is_google_fmt_date(text1) or _is_google_fmt_date(text2):
         try:
             date1 = dateutil.parser.parse(text1)
@@ -119,16 +192,13 @@ class Row(dict):
         self.db = {}
         dict.__init__(self)
 
-    def __setitem__(self, key, cell_elem):
-        dict.__setitem__(self, key, cell_elem)
-        text_val = cell_elem.cell.text
-        if text_val is None:
-            text_val = ''
-        self.db[key] = text_val
+    def __setitem__(self, key, cell):
+        dict.__setitem__(self, key, cell)
+        self.db[key] = cell.value
 
     def cell_list(self):
-        for cell_elem in self.itervalues():
-            yield (int(cell_elem.cell.row), int(cell_elem.cell.col), cell_elem)
+        for cell in self.itervalues():
+            yield cell
 
     def is_empty(self):
         return all((val is None or val == '') for val in self.db.itervalues())
@@ -183,6 +253,7 @@ class Header(object):
         return (header in self.header_to_col)
 
 
+
 class Sheet(object):
     """Represents a single worksheet within a google spreadsheet.
     
@@ -203,39 +274,29 @@ class Sheet(object):
         document_href: The HTML href for the google spreadsheet document
     """
 
-    # Global _pool object holds mapping to google connections. 
-    _ss_pool = {}
-    _doc_client_pool = {}
-
     def __init__(self, 
-                 # Google connection information:
-                 username,
-                 password,
-                 # Spreadsheet and worksheet name or key: 
-                 document_key=None, 
-                 document_name=None,
-                 sheet_name=None,
-                 # Operational modifiers:
+                 # Google OAuth2.0 connection information:
+                 credentials=None,
+                 # Spreadsheet key or name, and worksheet name
+                 document_key=None, document_name=None,
+                 worksheet_name=None,
+                 # Behavior modifiers
                  key_column_headers=None, 
                  header_row_ix=1,
                  formula_ref_row_ix=None,
                  flag_deletes=True,
                  protected_fields=None,
-                 # Advanced document creation behavior:
-                 template_key=None,
-                 template_name=None,
-                 folder_key=None,
-                 folder_name=None):
+                 # Document creation behavior
+                 template_key=None, template_name=None,
+                 folder_key=None, folder_name=None):
         """Creates a worksheet object (creating the Google doc if required)
 
         Args:
-          username (str): Google drive account username (an email address).
-
-          password (str): Password for account. To avoid capcha challenges or
-            two-factor authentication limits we recommend that you set up an 
-            application specific password for the script. For an explaination 
-            of this see:
-            https://support.google.com/accounts/answer/185833?hl=en
+          credentials (OAuth2Credentials): Credentials object returned by the
+            google authorization server. Described in detail in this article:
+            https://developers.google.com/api-client-library/python/guide/aaa_oauth
+            For testing and development consider using the helper function:
+                sheetsync.ia_credentials_helper()
 
           document_key (str): Document key for the existing spreadsheet to
             sync data to. This is a long hex string and can be found in the 
@@ -246,7 +307,7 @@ class Sheet(object):
             this is not found - it will be created. If known, identifying the 
             document by the document_key is faster.
 
-          sheet_name (str): The name of the worksheet inside the spreadsheet
+          worksheet_name (str): The name of the worksheet inside the spreadsheet
             that data will be synced to. If omitted then the default name
             "sheetsync data" will be used, and a worksheet created if
             necessary.
@@ -317,37 +378,38 @@ class Sheet(object):
         """
 
         # Record connection settings, and create a connection.
-        self.username = username
-        self.password = password
-        self.service = self._create_spreadsheet_service()
-        self.docs_client = self._create_docs_client()
+        self.credentials = credentials
+        self._drive_service = None
+        self._gspread_client = None
+        self._sheet = None              # Gspread sheet instance.
+        self._worksheet = None          # Gspread worksheet instance.
 
-        # Find or create the spreadsheet document
+        # Find or create the Google spreadsheet document
         document = self._find_document(document_key, document_name)
         if document is None:
             if document_name is None:
-                raise Exception("Must specify a document_name")
+                raise ValueError("Must specify a document_name")
             # We need to create the document
-            template = self._find_document(template_key, template_name)
+            template = self._find_document(template_key, template_name) 
             if template is None and template_name is not None:
-                raise KeyError("Could not find template: %s" % template_name)
+                raise ValueError("Could not find template: %s" % template_name)
             self.folder = self._find_or_create_folder(folder_key, folder_name)
             document = self._create_new_or_copy(source_doc=template, 
                                                 target_name=document_name, 
                                                 folder=self.folder)
-            if document is None:
+            if not document:
                 raise Exception("Could not create doc '%s'." % document_name)
   
         # Create attribute for document key
-        self.document_key = document.GetId().split('%3A')[1]
-        self.document_name = document.title.text
-        self.document_href = document.get_html_link().href
+        self.document_key = document['id']
+        self.document_name = document['title']
+        self.document_href = document['alternateLink']
 
         # Find or create the worksheet
-        if sheet_name is None:
+        if worksheet_name is None:
             logger.info("Using the default worksheet name")
-            sheet_name = DEFAULT_SHEET_NAME
-        self._find_or_create_worksheet(sheet_name)
+            worksheet_name = DEFAULT_WORKSHEET_NAME
+        self.worksheet_name = worksheet_name
 
         # Store off behavioural settings for interacting with the worksheet.
         if key_column_headers is None:
@@ -370,44 +432,57 @@ class Sheet(object):
         self.header_to_ref_formula = {}
         self.read_ref_formulas()
 
-    def _create_spreadsheet_service(self):
-        if self.username in self._ss_pool:
-            return self._ss_pool[self.username]
 
-        gc = gdata.spreadsheet.service.SpreadsheetsService()
-        logger.info("Creating new connection for user '%s'", self.username)
-        gc.email = self.username
-        gc.password = self.password
-        gc.source = SOURCE_STRING
+    @property
+    def sheet(self):
+        """ Finds and returns a gspread.Spreadsheet object """
+        if self._sheet:
+            return self._sheet
+        self._sheet = self.gspread_client.open_by_key(self.document_key)
+        return self._sheet
 
+    @property
+    def worksheet(self):
+        """ Finds (or creates) then returns a gspread.Worksheet object """
+        if self._worksheet:
+            return self._worksheet
         try:
-            gdata_log.info("Logging in")
-            gc.ProgrammaticLogin()
-        except gdata.service.CaptchaRequired:
-            gdata_log.info("Captcha login required")
-            captcha_token = gc._GetCaptchaToken()
-            url = gc._GetCaptchaURL()
-            print "Google login error. Please go to this URL:"
-            print "  " + url
-            captcha_response = raw_input("Type the captcha image here: ")
-            gdata_log.info("Logging in with captcha")
-            gc.ProgrammaticLogin(captcha_token, captcha_response)
+            try:
+                self._worksheet = self.sheet.worksheet(self.worksheet_name)
+            except WorksheetNotFound:
+                logger.info("Not found. Creating worksheet '%s'", self.worksheet_name)
+                self._worksheet = self.sheet.add_worksheet(title=self.worksheet_name, 
+                                                           rows=20, cols=10)
+        except Exception, e:
+            g_api_log.exception("Failed to find or create worksheet: %s. %s", 
+                                                      self.worksheet_name, e)
+            raise e
+        return self._worksheet
 
-        # Successful connection, save to the self._ss_pool
-        self._ss_pool[self.username] = gc
-        return gc
+    @property
+    def gspread_client(self):
+        if self._gspread_client:
+            return self._gspread_client
+        self._gspread_client = gspread.authorize(self.credentials)
+        self._gspread_client.login()
+        return self._gspread_client 
 
-    def _create_docs_client(self):
-        if self.username in self._doc_client_pool:
-            return self._doc_client_pool[self.username]
+    @property
+    def drive_service(self):
+        if self._drive_service:
+            return self._drive_service
 
-        g_doc_cl = gdata.docs.client.DocsClient()
-        logger.info("Creating google docs client for user '%s'", self.username)
-        g_doc_cl.client_login(self.username, self.password, SOURCE_STRING)
+        http = httplib2.Http()
+        if self.credentials.access_token_expired:
+            g_api_log.info('Refreshing expired credentials')
+            self.credentials.refresh(http)
 
-        # Successful connection, save to the connection pool.
-        self._doc_client_pool[self.username] = g_doc_cl
-        return g_doc_cl
+        g_api_log.info('Creating drive service')
+        http = self.credentials.authorize(http)
+        drive_service = apiclient.discovery.build('drive', 'v2', http=http)
+        # Cache the drive_service object for future calls. 
+        self._drive_service = drive_service 
+        return drive_service
 
 
     def _create_new_or_copy(self, 
@@ -418,85 +493,76 @@ class Sheet(object):
         if target_name is None:
             raise KeyError("Must specify a name for the new document")
 
+        body = { 'title': target_name }
+        if folder:
+            body['parents'] = [{ 'kind' : 'drive#parentReference',
+                                 'id' : folder['id'],
+                                 'isRoot' : False }]
+
+        drive_service = self.drive_service
         if source_doc is not None:
-            logger.info("Copying spreadsheet from template.")
+            logger.info("Copying spreadsheet.")
             try:
-                self.new_document = self.docs_client.copy_resource(source_doc,
-                                                            title=target_name)
+                new_document = drive_service.files().copy(fileId=source_doc['id'], body=body).execute()
             except Exception, e:
-                gdata_log.exception("gdata API error. %s", e)
+                g_api_log.exception("gdata API error. %s", e)
                 raise e
 
         else:
             # Create new blank spreadsheet.
             logger.info("Creating blank spreadsheet.")
-            rsrc = gdata.docs.data.Resource(type='spreadsheet',
-                                            title=target_name)
+            body['mimeType'] = 'application/vnd.google-apps.spreadsheet'
             try:
-                self.new_document = self.docs_client.create_resource(rsrc)
+                new_document = drive_service.files().insert(body=body).execute()
             except Exception, e:
-                gdata_log.exception("gdata API error. %s", e)
+                g_api_log.exception("gdata API error. %s", e)
                 raise e
 
-        logger.info("Created %s spreadsheet with Id: %s", 
+        logger.info("Created %s spreadsheet with ID '%s'", 
                 sheet_description,
-                self.new_document.GetId())
+                new_document.get('id'))
 
-        if folder is not None:
-            try:
-                self.docs_client.move_resource(self.new_document, 
-                                               folder, 
-                                               keep_in_collections=False)
-            except Exception, e:
-                gdata_log.exception("gdata API error. %s", e)
-                raise e
-
-            try:
-                self.docs_client.Delete(ROOT_FOLDER_URL + self.new_document.resource_id.text, 
-                                    force=True)
-            except Exception, e:
-                gdata_log.exception("gdata API error. %s", e)
-                raise e
-
-            logger.info("Moved resource to folder.")
-
-        return self.new_document
+        return new_document
 
     def _find_or_create_folder(self, folder_key=None, folder_name=None):
+        drive_service = self.drive_service
         if folder_key is not None:
             try:
-                folder_rsrc = self.docs_client.get_resource_by_id(folder_key)
-            except Exception, e:
-                gdata_log.exception("gdata API error. %s", e)
+                folder_rsrc = drive_service.files().get(fileId=folder_key).execute()
+            except apiclient.errors.HttpError, e:
+                # XXX: WRONG... probably returns 404 if not found,.. which is not an error.
+                g_api_log.exception("Google API error: %s", e)
                 raise e
 
-            if folder_rsrc is None:
+            if not folder_rsrc:
                 raise KeyError("Folder with key %s was not found." % folder_key)
             return folder_rsrc
 
         if not folder_name:
             return None
 
-        name_query = gdata.docs.client.DocsQuery(title=folder_name,
-                                                 title_exact='true',
-                                                 show_collections='true')
         try:
-            matches = self.docs_client.GetResources(q=name_query)
+            name_query = drive_service.files().list(
+                q=("title='%s' and trashed=false and "
+                   "mimeType='application/vnd.google-apps.folder'") % 
+                        folder_name.replace("'","\\'")
+                        ).execute()
+            items = name_query['items']
+            if len(items) == 1:
+                return items[0]
+            else:
+                raise KeyError("%s folders found named: %s" % (len(items), folder_name))
         except Exception, e:
-            gdata_log.exception("gdata API error. %s", e)
+            g_api_log.exception("Google API error. %s", e)
             raise e
 
-        for doc_rsrc in matches.entry:
-            if doc_rsrc.get_resource_type() == 'folder':
-                return doc_rsrc
-
-        logger.info("Creating the new folder: %s", folder_name)
-        new_folder_rsrc = gdata.docs.data.Resource(type='folder',
-                                                   title=folder_name)
+        logger.info("Creating a new folder named: '%s'", folder_name)
         try:
-            new_folder_rsrc = self.docs_client.create_resource(new_folder_rsrc)
+            new_folder_rsrc = drive_service.files().insert(
+                body={ 'mimeType' : 'application/vnd.google-apps.folder',
+                       'title' : folder_name }).execute()
         except Exception, e:
-            gdata_log.exception("gdata API error. %s", e)
+            g_api_log.exception("Google API error. %s", e)
             raise e
 
         return new_folder_rsrc
@@ -505,12 +571,13 @@ class Sheet(object):
     def _find_document(self, doc_key=None, doc_name=None):
         # Find the document by key and raise "KeyError" if not found.
         # Otherwise search by document_name
+        drive_service = self.drive_service
         if doc_key is not None:
             logger.debug("Finding document by key.")
             try:
-                doc_rsrc = self.docs_client.get_resource_by_id(doc_key)
+                doc_rsrc = drive_service.files().get(fileId=doc_key).execute()
             except Exception, e:
-                gdata_log.exception("gdata API error. %s", e)
+                g_api_log.exception("gdata API error. %s", e)
                 raise e
 
             if doc_rsrc is None:
@@ -520,186 +587,127 @@ class Sheet(object):
         if doc_name is None:
             return None
 
-        name_query = gdata.docs.client.DocsQuery(title=doc_name,
-                                                 title_exact='true')
         try:
-            matches = self.docs_client.GetResources(q=name_query)
+            name_query = drive_service.files().list(
+                q=("title='%s' and trashed=false and "
+                   "mimeType='application/vnd.google-apps.spreadsheet'") %
+                        doc_name.replace("'","\\'")
+                        ).execute()
+            matches = name_query['items']
         except Exception, e:
-            gdata_log.exception("gdata API error. %s", e)
+            g_api_log.exception("gdata API error. %s", e)
             raise e
 
-        if len(matches.entry) == 1:
-            return matches.entry[0]
+        if len(matches) == 1:
+            return matches[0]
 
-        if len(matches.entry) > 1:
-            raise KeyError("Too many matches for doc named: %s" % doc_name)
+        if len(matches) > 1:
+            raise KeyError("Too many matches for doc named '%s'" % doc_name)
         
         return None
 
 
-    def _find_or_create_worksheet(self, sheet_name):
-        logger.debug("Finding worksheet '%s'", sheet_name)
-        docquery = gdata.spreadsheet.service.DocumentQuery()
-        docquery.title = sheet_name
-        docquery.title_exact = 'true'
-        gdata_log.info("Getting worksheet feed")
-        try:
-            wks_feed = self.service.GetWorksheetsFeed(self.document_key, query=docquery)
-        except Exception, e:
-            gdata_log.exception("gdata API error. %s", e)
-            raise e
-
-        for entry in wks_feed.entry:
-            if entry.title.text == sheet_name:
-                self.sheet_obj = entry
-                self.sheet_id = self.sheet_obj.id.text.rsplit("/",1)[1]
-                return self.sheet_obj
-
-        logger.info("Adding a new worksheet named: %s" % sheet_name)
-        try:
-            new_sheet = self.service.AddWorksheet(sheet_name, '20', '10',
-                                                  self.document_key)
-        except Exception, e:
-            gdata_log.exception("gdata API error. %s", e)
-            raise e
-
-        if new_sheet is not None:
-            self.sheet_obj = new_sheet
-            self.sheet_id = self.sheet_obj.id.text.rsplit('/',1)[1]
-            return new_sheet
-
-        raise Exception("Couldn't add a new worksheet")
-
     def _extends(self, rows=None, columns=None):
         # Resizes the sheet if needed, to match the given
         # number of rows and/or columns
-        self.sheet_number_total_rows = int(self.sheet_obj.row_count.text)
-        self.sheet_number_total_cols = int(self.sheet_obj.col_count.text)
-
-        update_rows, update_cols = False, False
-        if rows is not None and rows > self.sheet_number_total_rows:
+        new_rows, new_cols = None, None
+        if rows is not None and rows > self.worksheet.row_count:
             # Need to add new rows to the spreadsheet.
-            update_rows = True
-        if columns is not None and columns > self.sheet_number_total_cols:
-            update_cols = True
+            new_rows = rows
+        if columns is not None and columns > self.worksheet.col_count:
+            new_cols = columns
 
-        if update_rows or update_cols:
-            gdata_log.info("_extends: fetching worksheet feed")
+        if new_rows or new_cols:
             try:
-                self.sheet_obj = self.service.GetWorksheetsFeed(self.document_key, 
-                                                  wksht_id=self.sheet_id)
+                self.worksheet.resize(rows=new_rows, cols=new_cols)
             except Exception, e:
-                gdata_log.exception("gdata API error. %s", e)
+                g_api_log.exception("Error resizing worksheet. %s", e)
                 raise e
 
-            if update_cols:
-                self.sheet_obj.col_count.text = str(columns)
-            if update_rows:
-                self.sheet_obj.row_count.text = str(rows)
 
-            gdata_log.info("_extends: updating worksheet")
-            try:
-                self.sheet_obj = self.service.UpdateWorksheet(self.sheet_obj)
-            except Exception, e:
-                gdata_log.exception("gdata API error. %s", e)
-                raise e
-
-            self.sheet_number_total_rows = int(self.sheet_obj.row_count.text)
-            self.sheet_number_total_cols = int(self.sheet_obj.col_count.text)
-
-
-    def _write_cell(self, cell_elem):
-        # Creates a batch_update if required, and adds the passed cell_elem
+    def _write_cell(self, cell):
+        # Creates a batch_update if required, and adds the passed cell
         # to it. Then tests if a flush_writes call is required (when the
         # batch write might be close to the 1MB limit)
-        if not self._batch_request:
-            self._batch_request = gdata.spreadsheet.SpreadsheetsCellsFeed()
+        if not self._batch_request: 
+            self._batch_request = []
 
-        gdata_log.debug("_write_cell: Adding batch update")
-        self._batch_request.AddUpdate(cell_elem)
+        g_api_log.debug("_write_cell: Adding batch update")
+        self._batch_request.append(cell)
 
-        if len(self._batch_request.ToString()) > MAX_BATCH_LEN:
+        if len(self._batch_request) > MAX_BATCH_LEN:
             self._flush_writes()
 
 
     def _flush_writes(self):
         # Write current batch_updates to google sheet.
         if self._batch_request:
-            gdata_log.info("_flush_writes: Writing %s cell writes",
-                                        len(self._batch_request.entry))
+            g_api_log.info("_flush_writes: Writing %s cell writes",
+                                        len(self._batch_request))
             try:
-                resp = self.service.ExecuteBatch(self._batch_request, 
-                                                 self._batch_href)
+                self.worksheet.update_cells(self._batch_request)
             except Exception, e:
-                gdata_log.exception("gdata API error. %s", e)
+                g_api_log.exception("gdata API error. %s", e)
                 raise e
 
             # Now check the response code. 
-            for entry in resp.entry:
-                if entry.batch_status.code != '200':
-                    error = "gdata API error. %s - %s" % (entry.batch_status.code,
-                                            entry.batch_status.reason)
-                    gdata_log.error("Batch update failed: %s", error)
-                    raise Exception(error)
+            #for entry in resp.entry:
+            #    if entry.batch_status.code != '200':
+            #        error = "gdata API error. %s - %s" % (entry.batch_status.code,
+            #                                entry.batch_status.reason)
+            #        g_api_log.error("Batch update failed: %s", error)
+            #        raise Exception(error)
 
-            self._batch_request = None
+            self._batch_request = []
 
 
-    def _cell_feed(self, row=None, max_row=None, further_rows=False, 
+    def _cell_feed(self, row=None, max_row=None, further_rows=False,        # XXX: REFACTOR
                          col=None, max_col=None, further_cols=False,
                          return_empty=False):
 
         # Fetches cell data for a given row, and all following rows if 
         # further_rows is True. If no row is given, all cells are returned.
-        cellquery = None
-        if row is not None or return_empty or col is not None:
-            cellquery = gdata.spreadsheet.service.CellQuery()
+        params = {}
         if row is not None:
-            cellquery.min_row = str(row)
+            params['min-row']=str(row)
             if max_row is not None:
-                cellquery.max_row = str(max_row)
+                params['max-row'] = str(max_row)
             elif not further_rows:
-                cellquery.max_row = str(row)
+                params['max-row'] = str(row)
 
         if col is not None:
-            cellquery.min_col = str(col)
+            params['min-col'] = str(col)
             if max_col is not None:
-                cellquery.max_col = str(max_col)
+                params['max-col'] = str(max_col)
             elif not further_cols:
-                cellquery.max_col = str(col)
+                params['max-col'] = str(col)
 
-            if (cellquery.min_col == cellquery.max_col and
-                cellquery.min_col == '0'):
+            if (params['min-col'] == params['max-col'] and
+                params['min-col'] == '0'):
                 return []
 
         if return_empty:
-            cellquery.return_empty = "true"
+            params['return-empty'] = "true"
 
-        gdata_log.info("getting cell feed")
+        g_api_log.info("getting cell feed")
         try:
-            rfeed = self.service.GetCellsFeed(key=self.document_key,
-                                              wksht_id=self.sheet_id,
-                                              query=cellquery)
+            feed = self.gspread_client.get_cells_feed(self.worksheet, params=params)
+            # Bit of a hack to rip out Gspread's xml parsing.
+            cfeed = [gspread.Cell(self, elem) for elem in
+                                        feed.findall(gspread.client._ns('entry'))]
         except Exception, e:
-            gdata_log.exception("gdata API error. %s", e)
+            g_api_log.exception("gspread error. %s", e)
             raise e
 
-        cells_list = []
-        for cell_elem in rfeed.entry:
-            row, col = int(cell_elem.cell.row), int(cell_elem.cell.col)
-            cells_list.append( (row, col, cell_elem) )
-
-        self._batch_href = rfeed.GetBatchLink().href
-
-        return cells_list
+        return cfeed
 
     def read_ref_formulas(self):
         self.header_to_ref_formula = {}
 
         if self.formula_ref_row_ix:
-            for row, col, cell_elem in self._cell_feed(row=self.formula_ref_row_ix):
-                ref_formula = cell_elem.cell.inputValue
-                header = self.header.col_lookup(col)
+            for cell in self._cell_feed(row=self.formula_ref_row_ix):
+                ref_formula = cell.input_value
+                header = self.header.col_lookup(cell.col)
                 if header and ref_formula.startswith("="):
                     self.header_to_ref_formula[header] = ref_formula
 
@@ -708,8 +716,8 @@ class Sheet(object):
         # Reads the header row, adds missing headers if required.
         self.header.reset()
 
-        for row, col, cell_elem in self._cell_feed(row=self.header_row_ix):
-            self.header.set(col, cell_elem.cell.text)
+        for cell in self._cell_feed(row=self.header_row_ix):
+            self.header.set(cell.col, cell.value)
  
         headers_to_add = []
         for key_field in self.key_column_headers:
@@ -731,14 +739,14 @@ class Sheet(object):
 
         cells_list = self._cell_feed(row=self.header_row_ix, 
                                      return_empty=True)
-        for row, col, cell_elem in cells_list:
+        for cell in cells_list:
             if not headers_to_add:
                 break
-            if not cell_elem.cell.text:
+            if not cell.value:
                 header = headers_to_add.pop(0)
-                cell_elem.cell.inputValue = header
-                self.header.set(col, header)
-                self._write_cell(cell_elem)
+                cell.value = header
+                self.header.set(cell.col, header)
+                self._write_cell(cell)
 
         if headers_to_add:
             raise CorruptHeader("Error adding headers")
@@ -760,10 +768,11 @@ class Sheet(object):
         """
 
         folder = self._find_or_create_folder(folder_key, folder_name)
+        drive_service = self.drive_service
         try:
-            source_rsrc = self.docs_client.get_resource_by_id(self.document_key)
+            source_rsrc = drive_service.files().get(fileId=self.document_key).execute()
         except Exception, e:
-            gdata_log.exception("gdata API error. %s", e)
+            g_api_log.exception("Google API error. %s", e)
             raise e
 
         backup = self._create_new_or_copy(source_doc=source_rsrc, 
@@ -771,25 +780,25 @@ class Sheet(object):
                                         folder=folder,
                                         sheet_description="backup")
 
-        backup_key = backup.GetId().rsplit('%3A',1)[1]
+        backup_key = backup['id']
         return backup_key
          
     def _yield_rows(self, cells_feed):
         cur_row = None
-        for row, col, cell_elem in cells_feed:
-            if row <= self.header_row_ix:
+        for cell in cells_feed:
+            if cell.row <= self.header_row_ix:
                 # Never yield the header from this function to avoid overwrites
                 continue
-            if self.formula_ref_row_ix and row == self.formula_ref_row_ix:
+            if self.formula_ref_row_ix and cell.row == self.formula_ref_row_ix:
                 # Never yield the formula ref row to avoid overwrites
                 continue
-            if cur_row is None or cur_row.row_num != row:
+            if cur_row is None or cur_row.row_num != cell.row:
                 if cur_row is not None:
                     yield cur_row
                 # Make a new row.
-                cur_row = Row(row)
-            if col in self.header.columns:
-                cur_row[self.header.col_lookup(col)] = cell_elem
+                cur_row = Row(cell.row)
+            if cell.col in self.header.columns:
+                cur_row[self.header.col_lookup(cell.col)] = cell
 
         if cur_row is not None:
             yield cur_row
@@ -887,8 +896,10 @@ class Sheet(object):
                     self.key_column_headers = ["Key-%s" % i for i in range(1,len(key)+1)]
 
             # Cast row_data values to strings.
-            fixed_row_data = dict((key, str(val)) for key,val in row_data.iteritems())
-            fixed_data[key] = fixed_row_data
+            # XXX:UNICODE
+            #fixed_row_data = dict((key, str(val)) for key,val in row_data.iteritems())
+            #fixed_data[key] = fixed_row_data
+            fixed_data[key] = dict(row_data.items())
 
             missing_raw_keys.add(key)
             if len(key) != self.key_length:
@@ -984,7 +995,7 @@ class Sheet(object):
             logger.debug("%s: %s", ".".join(key_tuple), description)
 
     def _is_flagged_delete(self, key_tuple, wks_row):
-        # Ideally we'd use strikethrough to indicate deletes - but gdata
+        # Ideally we'd use strikethrough to indicate deletes - but Google api
         # doesn't allow access to get or set formatting.
         for key in key_tuple:
             if key.endswith(DELETE_ME_FLAG):
@@ -992,18 +1003,18 @@ class Sheet(object):
         return False
 
     def _delete_flag_row(self, key_tuple, wks_row):
-        for row, col, cell_elem in wks_row.cell_list():
-            if self.header.col_lookup(col) in self.key_column_headers:
+        for cell in wks_row.cell_list():
+            if self.header.col_lookup(cell.col) in self.key_column_headers:
                 # Append the DELETE_ME_FLAG
-                cell_elem.cell.inputValue = "%s%s" % (cell_elem.cell.text,DELETE_ME_FLAG)
-                self._write_cell(cell_elem)
+                cell.value = "%s%s" % (cell.value,DELETE_ME_FLAG)
+                self._write_cell(cell)
 
         self._log_change(key_tuple, "Deleted entry")
 
     def _delete_row(self, key_tuple, wks_row):
-        for row, col, cell_elem in wks_row.cell_list():
-            cell_elem.cell.inputValue = ''
-            self._write_cell(cell_elem)
+        for cell in wks_row.cell_list():
+            cell.value = ''
+            self._write_cell(cell)
 
     def _get_value_for_column(self, key_tuple, raw_row, col):
         # Given a column, and a row dictionary.. returns the value
@@ -1031,12 +1042,12 @@ class Sheet(object):
 
     def _insert_row(self, key_tuple, wks_row, raw_row):
 
-        for row, col, cell_elem in wks_row.cell_list():
-            if col in self.header.columns:
-                value = str(self._get_value_for_column(key_tuple, raw_row, col))
+        for cell in wks_row.cell_list():
+            if cell.col in self.header.columns:
+                value = self._get_value_for_column(key_tuple, raw_row, cell.col)
                 logger.debug("Batching write of %s", value[:50])
-                cell_elem.cell.inputValue = value
-                self._write_cell(cell_elem)
+                cell.value = value
+                self._write_cell(cell)
 
         logger.debug("Inserting row %s with batch operation.", wks_row.row_num)
 
@@ -1049,11 +1060,11 @@ class Sheet(object):
                     row_change_callback):
 
         changed_fields = []
-        for row, col, cell_elem in wks_row.cell_list():
-            if col not in self.header.columns:
+        for cell in wks_row.cell_list():
+            if cell.col not in self.header.columns:
                 continue
 
-            header = self.header.col_lookup(col)
+            header = self.header.col_lookup(cell.col)
             if header in different_fields:
                 raw_val = raw_row[header]
                 sheet_val = wks_row.db.get(header,"")
@@ -1061,8 +1072,8 @@ class Sheet(object):
                     # Do not overwrite this protected field.
                     continue
 
-                cell_elem.cell.inputValue = raw_val
-                self._write_cell(cell_elem)
+                cell.value = raw_val
+                self._write_cell(cell)
                 changed_fields.append(header)
                 self._log_change(key_tuple, ("Updated %s" % header), 
                                  old_val=sheet_val, new_val=raw_val)
