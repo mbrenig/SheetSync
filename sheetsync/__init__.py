@@ -43,11 +43,9 @@ from gspread import SpreadsheetNotFound, WorksheetNotFound
 
 import dateutil.parser # pip install python-dateutil
 
-logger = logging.getLogger('sheetsync')         # XXX: Refactor.. just one logger should be fine!
-change_log = logging.getLogger('sheetsync.change')
-g_api_log = logging.getLogger('g_api')
+logger = logging.getLogger('sheetsync')
 
-MAX_BATCH_LEN = 50   # Google's limit is 1MB or 1000 batch entries. # XXX: REFACTOR?
+MAX_BATCH_LEN = 500   # Google's limit is 1MB or 1000 batch entries.
 DELETE_ME_FLAG = ' (DELETED)'
 DEFAULT_WORKSHEET_NAME = 'Sheet1'
 
@@ -55,18 +53,20 @@ def ia_credentials_helper(client_id, client_secret,
                           credentials_cache_file="credentials.json",
                           cache_key="default"):
     """Helper function to manage a credentials cache during testing.
-    
-    Args:
-      client_id (str): A Google Drive API client id string for an installed app
-      client_secret (str): The corresponding client secret.
-      credentials_cache_file (str): Filepath to the json credentials cache file
-      cache_key (str): Optional string to allow multiple credentials for a client
-                       to be stored in the cache.
-    Returns:
-      credentials (OAuth2Credentials): A google api credentials object.
 
     This function will attempt to load and refresh a credentials object from a
     json cache file.
+  
+    Args:
+        client_id (str): Google Drive API client id string for an installed app
+        client_secret (str): The corresponding client secret.
+        credentials_cache_file (str): Filepath to the json credentials cache file
+        cache_key (str): Optional string to allow multiple credentials for a client
+           to be stored in the cache.
+
+    Returns:
+        OAuth2Credentials: A google api credentials object.
+
     """
     def _load_credentials(key):
         with open(credentials_cache_file, 'rb') as inf:
@@ -255,7 +255,7 @@ class Header(object):
 
 
 class Sheet(object):
-    """Represents a single worksheet within a google spreadsheet.
+    """ Represents a single worksheet within a google spreadsheet.
     
     This class tracks the google connection, the reference to the worksheet, as
     well as options governing the structure of the data in the worksheet.. for
@@ -263,21 +263,17 @@ class Sheet(object):
         * Where the header row is found
         * What header should be used for the key column(s)
         * Whether some columns are protected
-    see the __init__ function.for all the options.
-
+   
     Attributes:
-        document_key: The key of the spreadsheet. If you are relying on
-          sheetsync to automatically create a spreadsheet then use this
-          attribute to access the document_key.. and make sure you pass 
-          it as a parameter in subsequent calls to __init__
-        document_name: The title of the google spreadsheet document
-        document_href: The HTML href for the google spreadsheet document
+       document_key (str): The key of the spreadsheet. If you are relying on
+           sheetsync to automatically create a spreadsheet then use this
+           attribute to access the document_key.. and make sure you pass 
+           it as a parameter in subsequent calls to __init__
+       document_name (str): The title of the google spreadsheet document
+       document_href (str): The HTML href for the google spreadsheet document
     """
-
     def __init__(self, 
-                 # Google OAuth2.0 connection information:
                  credentials=None,
-                 # Spreadsheet key or name, and worksheet name
                  document_key=None, document_name=None,
                  worksheet_name=None,
                  # Behavior modifiers
@@ -292,88 +288,76 @@ class Sheet(object):
         """Creates a worksheet object (creating the Google doc if required)
 
         Args:
-          credentials (OAuth2Credentials): Credentials object returned by the
-            google authorization server. Described in detail in this article:
-            https://developers.google.com/api-client-library/python/guide/aaa_oauth
-            For testing and development consider using the helper function:
-                sheetsync.ia_credentials_helper()
-
-          document_key (str): Document key for the existing spreadsheet to
-            sync data to. This is a long hex string and can be found in the 
-            URL of the spreadsheet. See this article for more:
-            https://productforums.google.com/forum/#!topic/docs/XPOR9bTTS50
-
-          document_name (str): The name of the spreadsheet to sync to, if
-            this is not found - it will be created. If known, identifying the 
-            document by the document_key is faster.
-
-          worksheet_name (str): The name of the worksheet inside the spreadsheet
-            that data will be synced to. If omitted then the default name
-            "sheetsync data" will be used, and a worksheet created if
-            necessary.
-
-         key_column_headers (list of str): Data in the key column(s) uniquely
-            identifies a row in your data. So, for example, if your data is 
-            indexed by a single username string, that you want to store in a
-            column with the header 'Username', you would pass this:
-                key_column_headers=["Username"]
-            However, we also support component keys. Python dictionaries can
-            use tuples as keys, if you pass in a tuple like:
-                ("Tesla","Model-S","2013")
-            then you could pass in a list of three column headers, e.g.:
-                ["Make", "Model", "Year"]
-            If no value is given, then the default behavior is to name the
-            column "Key"; or "Key-1", "Key-2", ... if your dictionary keys are
-            tuples.
-
-          header_row_ix (int): The row number we expect to see column headers
-            in. Defaults to 1 (the very top row).
- 
-          formula_ref_row_ix (int): If you want formulas to be added to some
-            cells when inserting new rows then use a formula reference row. We
-            recommend you use row 1 for formula references (then hide that row)
-            and start the header on row 2.
-            As an example, imagine you have a column A containing product 
-            indexes and want to have a column B containing hyperlinks
-            to a page describing the product. You could populate cell B1 with
-            the formula:
-              =Hyperlink(Concatenate("http://widgets.com/product/",RC[-1]),RC[-1])
-            When adding rows to the spreadsheet, sheetsync will copy this
-            formula into the B column.
-
-          flag_deletes (bool): Specify if deleted rows should only be flagged
-            for deletion. By default sheetsync does not delete rows of data, it
-            just marks that they are deleted by appending the string 
-            " (DELETED)" to key values. If you pass in the value "False" then
-            rows of data will be deleted by the sync() method if they are not
-            found in the input data. Use the inject() method if you only want
-            to add data to a worksheet.
-
-          protected_fields (list of str): An optional list of fields (column 
-            headers) that contain protected data. sheetsync will only write to 
-            cells in these columns if they are blank. This can be useful if you
-            are expecting users of the spreadsheet to colaborate on the document
-            and edit values in certain columns (e.g. modifying a "Test result" 
-            column from "PENDING" to "PASSED") and don't want to overwrite
-            their edits.
-
-          template_key (str): This optional key references the spreadsheet 
-            that will be copied if a new spreadsheet needs to be created. 
-            This is useful for copying over formatting, a specific header 
-            order, or apps-script functions.
-
-          template_name (str): As with template_key but the name of the
-            template spreadsheet. If known, using the template_key will be
-            faster.
- 
-          folder_key (str): This optional key references the folder that a new
-            spreadsheet will be moved to if a new spreadsheet needs to be
-            created.
-
-          folder_name (str): Like folder_key this parameter specifies the
-            optional folder that a spreadsheet will be created in (if
-            required). If a folder matching the name cannot be found, sheetsync
-            will attempt to create it.
+            credentials (OAuth2Credentials): Credentials object returned by the
+                google authorization server. Described in detail in this article:
+                https://developers.google.com/api-client-library/python/guide/aaa_oauth
+                For testing and development consider using the helper function:
+                    sheetsync.ia_credentials_helper()
+            document_key (str): Document key for the existing spreadsheet to
+                sync data to. This is a long hex string and can be found in the 
+                URL of the spreadsheet. See this article for more:
+                https://productforums.google.com/forum/#!topic/docs/XPOR9bTTS50
+            document_name (str): The name of the spreadsheet to sync to, if
+                this is not found - it will be created. If known, identifying the 
+                document by the document_key is faster.
+            worksheet_name (str): The name of the worksheet inside the spreadsheet
+                that data will be synced to. If omitted then the default name
+                "sheetsync data" will be used, and a worksheet created if
+                necessary.
+            key_column_headers (list of str): Data in the key column(s) uniquely
+                identifies a row in your data. So, for example, if your data is 
+                indexed by a single username string, that you want to store in a
+                column with the header 'Username', you would pass this:
+                    key_column_headers=["Username"]
+                However, we also support component keys. Python dictionaries can
+                use tuples as keys, if you pass in a tuple like:
+                    ("Tesla","Model-S","2013")
+                then you could pass in a list of three column headers, e.g.:
+                    ["Make", "Model", "Year"]
+                If no value is given, then the default behavior is to name the
+                column "Key"; or "Key-1", "Key-2", ... if your dictionary keys are
+                tuples.
+            header_row_ix (int): The row number we expect to see column headers
+                in. Defaults to 1 (the very top row).
+            formula_ref_row_ix (int): If you want formulas to be added to some
+                cells when inserting new rows then use a formula reference row. We
+                recommend you use row 1 for formula references (then hide that row)
+                and start the header on row 2.
+                As an example, imagine you have a column A containing product 
+                indexes and want to have a column B containing hyperlinks
+                to a page describing the product. You could populate cell B1 with
+                the formula:
+                  =Hyperlink(Concatenate("http://widgets.com/product/",RC[-1]),RC[-1])
+                When adding rows to the spreadsheet, sheetsync will copy this
+                formula into the B column.
+            flag_deletes (bool): Specify if deleted rows should only be flagged
+                for deletion. By default sheetsync does not delete rows of data, it
+                just marks that they are deleted by appending the string 
+                " (DELETED)" to key values. If you pass in the value "False" then
+                rows of data will be deleted by the sync() method if they are not
+                found in the input data. Use the inject() method if you only want
+                to add data to a worksheet.
+            protected_fields (list of str): An optional list of fields (column 
+                headers) that contain protected data. sheetsync will only write to 
+                cells in these columns if they are blank. This can be useful if you
+                are expecting users of the spreadsheet to colaborate on the document
+                and edit values in certain columns (e.g. modifying a "Test result" 
+                column from "PENDING" to "PASSED") and don't want to overwrite
+                their edits.
+            template_key (str): This optional key references the spreadsheet 
+                that will be copied if a new spreadsheet needs to be created. 
+                This is useful for copying over formatting, a specific header 
+                order, or apps-script functions.
+            template_name (str): As with template_key but the name of the
+                template spreadsheet. If known, using the template_key will be
+                faster.
+            folder_key (str): This optional key references the folder that a new
+                spreadsheet will be moved to if a new spreadsheet needs to be
+                created.
+            folder_name (str): Like folder_key this parameter specifies the
+                optional folder that a spreadsheet will be created in (if
+                required). If a folder matching the name cannot be found, sheetsync
+                will attempt to create it.
  
         """
 
@@ -435,7 +419,7 @@ class Sheet(object):
 
     @property
     def sheet(self):
-        """ Finds and returns a gspread.Spreadsheet object """
+        # Finds and returns a gspread.Spreadsheet object
         if self._sheet:
             return self._sheet
         self._sheet = self.gspread_client.open_by_key(self.document_key)
@@ -443,7 +427,7 @@ class Sheet(object):
 
     @property
     def worksheet(self):
-        """ Finds (or creates) then returns a gspread.Worksheet object """
+        # Finds (or creates) then returns a gspread.Worksheet object 
         if self._worksheet:
             return self._worksheet
         try:
@@ -454,7 +438,7 @@ class Sheet(object):
                 self._worksheet = self.sheet.add_worksheet(title=self.worksheet_name, 
                                                            rows=20, cols=10)
         except Exception, e:
-            g_api_log.exception("Failed to find or create worksheet: %s. %s", 
+            logger.exception("Failed to find or create worksheet: %s. %s", 
                                                       self.worksheet_name, e)
             raise e
         return self._worksheet
@@ -474,10 +458,10 @@ class Sheet(object):
 
         http = httplib2.Http()
         if self.credentials.access_token_expired:
-            g_api_log.info('Refreshing expired credentials')
+            logger.info('Refreshing expired credentials')
             self.credentials.refresh(http)
 
-        g_api_log.info('Creating drive service')
+        logger.info('Creating drive service')
         http = self.credentials.authorize(http)
         drive_service = apiclient.discovery.build('drive', 'v2', http=http)
         # Cache the drive_service object for future calls. 
@@ -493,11 +477,11 @@ class Sheet(object):
         if target_name is None:
             raise KeyError("Must specify a name for the new document")
 
-        body = { 'title': target_name }
+        body = {'title': target_name }
         if folder:
-            body['parents'] = [{ 'kind' : 'drive#parentReference',
-                                 'id' : folder['id'],
-                                 'isRoot' : False }]
+            body['parents'] = [{'kind' : 'drive#parentReference',
+                                'id' : folder['id'],
+                                'isRoot' : False }]
 
         drive_service = self.drive_service
         if source_doc is not None:
@@ -505,7 +489,7 @@ class Sheet(object):
             try:
                 new_document = drive_service.files().copy(fileId=source_doc['id'], body=body).execute()
             except Exception, e:
-                g_api_log.exception("gdata API error. %s", e)
+                logger.exception("gdata API error. %s", e)
                 raise e
 
         else:
@@ -515,7 +499,7 @@ class Sheet(object):
             try:
                 new_document = drive_service.files().insert(body=body).execute()
             except Exception, e:
-                g_api_log.exception("gdata API error. %s", e)
+                logger.exception("gdata API error. %s", e)
                 raise e
 
         logger.info("Created %s spreadsheet with ID '%s'", 
@@ -531,7 +515,7 @@ class Sheet(object):
                 folder_rsrc = drive_service.files().get(fileId=folder_key).execute()
             except apiclient.errors.HttpError, e:
                 # XXX: WRONG... probably returns 404 if not found,.. which is not an error.
-                g_api_log.exception("Google API error: %s", e)
+                logger.exception("Google API error: %s", e)
                 raise e
 
             if not folder_rsrc:
@@ -553,7 +537,7 @@ class Sheet(object):
             else:
                 raise KeyError("%s folders found named: %s" % (len(items), folder_name))
         except Exception, e:
-            g_api_log.exception("Google API error. %s", e)
+            logger.exception("Google API error. %s", e)
             raise e
 
         logger.info("Creating a new folder named: '%s'", folder_name)
@@ -562,7 +546,7 @@ class Sheet(object):
                 body={ 'mimeType' : 'application/vnd.google-apps.folder',
                        'title' : folder_name }).execute()
         except Exception, e:
-            g_api_log.exception("Google API error. %s", e)
+            logger.exception("Google API error. %s", e)
             raise e
 
         return new_folder_rsrc
@@ -577,7 +561,7 @@ class Sheet(object):
             try:
                 doc_rsrc = drive_service.files().get(fileId=doc_key).execute()
             except Exception, e:
-                g_api_log.exception("gdata API error. %s", e)
+                logger.exception("gdata API error. %s", e)
                 raise e
 
             if doc_rsrc is None:
@@ -595,7 +579,7 @@ class Sheet(object):
                         ).execute()
             matches = name_query['items']
         except Exception, e:
-            g_api_log.exception("gdata API error. %s", e)
+            logger.exception("gdata API error. %s", e)
             raise e
 
         if len(matches) == 1:
@@ -621,7 +605,7 @@ class Sheet(object):
             try:
                 self.worksheet.resize(rows=new_rows, cols=new_cols)
             except Exception, e:
-                g_api_log.exception("Error resizing worksheet. %s", e)
+                logger.exception("Error resizing worksheet. %s", e)
                 raise e
 
 
@@ -632,7 +616,7 @@ class Sheet(object):
         if not self._batch_request: 
             self._batch_request = []
 
-        g_api_log.debug("_write_cell: Adding batch update")
+        logger.debug("_write_cell: Adding batch update")
         self._batch_request.append(cell)
 
         if len(self._batch_request) > MAX_BATCH_LEN:
@@ -642,12 +626,12 @@ class Sheet(object):
     def _flush_writes(self):
         # Write current batch_updates to google sheet.
         if self._batch_request:
-            g_api_log.info("_flush_writes: Writing %s cell writes",
+            logger.info("_flush_writes: Writing %s cell writes",
                                         len(self._batch_request))
             try:
                 self.worksheet.update_cells(self._batch_request)
             except Exception, e:
-                g_api_log.exception("gdata API error. %s", e)
+                logger.exception("gdata API error. %s", e)
                 raise e
 
             # Now check the response code. 
@@ -655,7 +639,7 @@ class Sheet(object):
             #    if entry.batch_status.code != '200':
             #        error = "gdata API error. %s - %s" % (entry.batch_status.code,
             #                                entry.batch_status.reason)
-            #        g_api_log.error("Batch update failed: %s", error)
+            #        logger.error("Batch update failed: %s", error)
             #        raise Exception(error)
 
             self._batch_request = []
@@ -669,7 +653,7 @@ class Sheet(object):
         # further_rows is True. If no row is given, all cells are returned.
         params = {}
         if row is not None:
-            params['min-row']=str(row)
+            params['min-row'] = str(row)
             if max_row is not None:
                 params['max-row'] = str(max_row)
             elif not further_rows:
@@ -689,14 +673,14 @@ class Sheet(object):
         if return_empty:
             params['return-empty'] = "true"
 
-        g_api_log.info("getting cell feed")
+        logger.info("getting cell feed")
         try:
             feed = self.gspread_client.get_cells_feed(self.worksheet, params=params)
             # Bit of a hack to rip out Gspread's xml parsing.
             cfeed = [gspread.Cell(self, elem) for elem in
                                         feed.findall(gspread.client._ns('entry'))]
         except Exception, e:
-            g_api_log.exception("gspread error. %s", e)
+            logger.exception("gspread error. %s", e)
             raise e
 
         return cfeed
@@ -772,7 +756,7 @@ class Sheet(object):
         try:
             source_rsrc = drive_service.files().get(fileId=self.document_key).execute()
         except Exception, e:
-            g_api_log.exception("Google API error. %s", e)
+            logger.exception("Google API error. %s", e)
             raise e
 
         backup = self._create_new_or_copy(source_doc=source_rsrc, 
@@ -804,8 +788,8 @@ class Sheet(object):
             yield cur_row
 
     def data(self, as_cells=False):
-        # Reads the worksheet and returns an indexed dictionary of the
-        # row objects.
+        """ Reads the worksheet and returns an indexed dictionary of the
+        row objects. """
         sheet_data = {}
         self.max_row = max(self.header_row_ix, self.formula_ref_row_ix)
         all_cells = self._cell_feed(row=self.max_row+1,
@@ -872,9 +856,11 @@ class Sheet(object):
     # sync and update.
     #--------------------------------------------------------------------------
     def sync(self, raw_data, row_change_callback=None):
+        """ TODO: Document this func """
         return self._update(raw_data, row_change_callback, delete_rows=True)
 
     def inject(self, raw_data, row_change_callback=None):
+        """ TODO: Document this also """
         return self._update(raw_data, row_change_callback, delete_rows=False)
 
     def _update(self, raw_data, row_change_callback=None, delete_rows=False):
@@ -899,7 +885,7 @@ class Sheet(object):
             # XXX:UNICODE
             #fixed_row_data = dict((key, str(val)) for key,val in row_data.iteritems())
             #fixed_data[key] = fixed_row_data
-            fixed_data[key] = dict(row_data.items())
+            fixed_data[key] = dict([(k,unicode(v)) for (k,v) in row_data.items()])
 
             missing_raw_keys.add(key)
             if len(key) != self.key_length:

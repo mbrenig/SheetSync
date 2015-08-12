@@ -1,3 +1,4 @@
+.DS_Store
 *.pyc
 .mysecrets
 .coverage
@@ -7,3 +8,5 @@ SheetSync.egg-info
 build
 dist
 MANIFEST
+credentials.json
+docs/_build/**
