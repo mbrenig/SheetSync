@@ -487,6 +487,8 @@ class Sheet(object):
         if source_doc is not None:
             logger.info("Copying spreadsheet.")
             try:
+                print body
+                print source_doc['id']
                 new_document = drive_service.files().copy(fileId=source_doc['id'], body=body).execute()
             except Exception, e:
                 logger.exception("gdata API error. %s", e)
@@ -510,6 +512,7 @@ class Sheet(object):
 
     def _find_or_create_folder(self, folder_key=None, folder_name=None):
         drive_service = self.drive_service
+        # Search by folder key.. raise Exception if not found.
         if folder_key is not None:
             try:
                 folder_rsrc = drive_service.files().get(fileId=folder_key).execute()
@@ -525,6 +528,7 @@ class Sheet(object):
         if not folder_name:
             return None
 
+        # Search by folder name.
         try:
             name_query = drive_service.files().list(
                 q=("title='%s' and trashed=false and "
@@ -534,7 +538,7 @@ class Sheet(object):
             items = name_query['items']
             if len(items) == 1:
                 return items[0]
-            else:
+            elif len(items) > 1:
                 raise KeyError("%s folders found named: %s" % (len(items), folder_name))
         except Exception, e:
             logger.exception("Google API error. %s", e)
@@ -881,10 +885,7 @@ class Sheet(object):
                 else:
                     self.key_column_headers = ["Key-%s" % i for i in range(1,len(key)+1)]
 
-            # Cast row_data values to strings.
-            # XXX:UNICODE
-            #fixed_row_data = dict((key, str(val)) for key,val in row_data.iteritems())
-            #fixed_data[key] = fixed_row_data
+            # Cast row_data values to unicode strings.
             fixed_data[key] = dict([(k,unicode(v)) for (k,v) in row_data.items()])
 
             missing_raw_keys.add(key)

@@ -12,8 +12,8 @@ strings. For instance:
 import sheetsync
 import time, os
 
-GOOGLE_U = os.environ.get("SHEETSYNC_GOOGLE_ACCOUNT")
-GOOGLE_P = os.environ.get("SHEETSYNC_GOOGLE_PASSWORD")
+CLIENT_ID = os.environ['SHEETSYNC_CLIENT_ID']  
+CLIENT_SECRET = os.environ['SHEETSYNC_CLIENT_SECRET']
 
 TEMPLATE_DOC = "0AsrRHMfAlOZrdFlLLWlzM2dhZ0tyS1k5RUxmVGU3cEE"
 TESTS_FOLDER_KEY = os.environ.get("SHEETSYNC_FOLDER_KEY")

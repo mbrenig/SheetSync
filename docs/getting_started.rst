@@ -103,7 +103,11 @@ sheet in a google spreadsheet document you do this:
 .. code-block:: python
    :linenos:
 
+   import logging
    from sheetsync import Sheet, ia_credentials_helper
+   # Turn on logging so you can see what sheetsync is doing.
+   logging.getLogger('sheetsync').setLevel(logging.DEBUG)
+   logging.basicConfig()
 
    # Create credentials, or recover from a cache.
    CLIENT_ID = '171566521677-3ppd15g5u4lv93van0eri4tbk4fmaq2c.apps.googleusercontent.com'
@@ -119,7 +123,7 @@ sheet in a google spreadsheet document you do this:
    target.inject(data)
    print "Spreadsheet created here: %s" % target.document_href
 
-The first part of this script (lines 1-7) imports the ``Sheet`` object and
+The first part of this script (lines 1-11) imports the ``Sheet`` object and
 ``ia_credentials_helper`` function. This function is included to help you quickly
 generate an `OAuth2Credentials <https://google-api-python-client.googlecode.com/hg/docs/epy/oauth2client.client.OAuth2Credentials-class.html>`_ object using your Client ID and Secret.
 
@@ -141,9 +145,9 @@ script:
 At this point ``ia_credentials_helper`` also caches the credentials - so that
 you don't need to repeat this step on future runs of the script.
 
-The later code defines the table data (lines 9,10) then line 13 
+The later code defines the table data (lines 13,14) then line 17
 creates a new spreadsheet document in your google drive. 
-Finaly line 14 inserts the data resulting in:
+Finaly line 18 inserts the data resulting in:
 
 .. image:: Sheet1.png
 

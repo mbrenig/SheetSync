@@ -21,7 +21,7 @@ setup(
     platforms='any',
     install_requires=requirements,
     classifiers=[
-        "Development Status :: 1 - Planning",
+        "Development Status :: 4 - Beta",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 2.7",
         ],

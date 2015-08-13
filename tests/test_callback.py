@@ -7,8 +7,8 @@ import time, os
 
 # TODO: Use this: http://stackoverflow.com/questions/22574109/running-tests-with-api-authentication-in-travis-ci-without-exposing-api-password
 
-GOOGLE_U = os.environ.get("SHEETSYNC_GOOGLE_ACCOUNT")
-GOOGLE_P = os.environ.get("SHEETSYNC_GOOGLE_PASSWORD")
+CLIENT_ID = os.environ['SHEETSYNC_CLIENT_ID']  
+CLIENT_SECRET = os.environ['SHEETSYNC_CLIENT_SECRET']
 
 TESTS_FOLDER = os.environ.get("SHEETSYNC_FOLDER_KEY")
 # Template hosted by a dedicated "sheetsync" account that Mark set up.

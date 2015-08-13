@@ -7,10 +7,10 @@ Test document creation:
 """
 
 import sheetsync
-import time, os
+import time, os, sys
 
-GOOGLE_U = os.environ.get("SHEETSYNC_GOOGLE_ACCOUNT")
-GOOGLE_P = os.environ.get("SHEETSYNC_GOOGLE_PASSWORD")
+CLIENT_ID = os.environ['SHEETSYNC_CLIENT_ID']  
+CLIENT_SECRET = os.environ['SHEETSYNC_CLIENT_SECRET']
 
 TEMPLATE_DOC_KEY = "TODO"
 TEMPLATE_DOC_NAME = "Interesting edge case?"
@@ -30,56 +30,62 @@ def test_create_from_copy_template_name():
 """
 
 def test_move_to_folder_by_key():
-    new_doc_name = '%s %s' % (__name__, int(time.time()))
-    target = sheetsync.Sheet(GOOGLE_U,
-                             GOOGLE_P,
+    creds = sheetsync.ia_credentials_helper(CLIENT_ID, CLIENT_SECRET, 
+                    credentials_cache_file='credentials.json',
+                    cache_key='default')
+
+    new_doc_name = '%s-%s-%s' % (__name__, sys._getframe().f_code.co_name, int(time.time()))
+    target = sheetsync.Sheet(credentials=creds,
                              document_name = new_doc_name,
-                             sheet_name = 'Sheet1',
+                             worksheet_name = 'Sheet1',
                              folder_key = TESTS_FOLDER_KEY)
     # Delete the doc
-    gdc = target._doc_client_pool[GOOGLE_U]
-    target_rsrc = gdc.get_resource_by_id(target.document_key)
-    gdc.Delete(target_rsrc)
+    target.drive_service.files().delete(fileId=target.document_key).execute()
 
 
 def test_move_to_folder_by_name():
-    new_doc_name = '%s %s' % (__name__, int(time.time()))
-    target = sheetsync.Sheet(GOOGLE_U,
-                             GOOGLE_P,
+    creds = sheetsync.ia_credentials_helper(CLIENT_ID, CLIENT_SECRET, 
+                    credentials_cache_file='credentials.json',
+                    cache_key='default')
+
+    new_doc_name = '%s-%s-%s' % (__name__, sys._getframe().f_code.co_name, int(time.time()))
+    target = sheetsync.Sheet(credentials=creds,
                              document_name = new_doc_name,
-                             sheet_name = 'Sheet1',
+                             worksheet_name = 'Sheet1',
                              folder_name = TESTS_FOLDER_NAME)
     # Delete the doc
-    target_rsrc = target.docs_client.get_resource_by_id(target.document_key)
-    target.docs_client.Delete(target_rsrc)
+    target.drive_service.files().delete(fileId=target.document_key).execute()
 
 
 def test_move_to_new_folder_by_name():
-    new_doc_name = '%s %s' % (__name__, int(time.time()))
+    creds = sheetsync.ia_credentials_helper(CLIENT_ID, CLIENT_SECRET, 
+                    credentials_cache_file='credentials.json',
+                    cache_key='default')
+
+    new_doc_name = '%s-%s-%s' % (__name__, sys._getframe().f_code.co_name, int(time.time()))
     new_folder_name = 'sheetsync testrun %s' % int(time.time())
-    target = sheetsync.Sheet(GOOGLE_U,
-                             GOOGLE_P,
+    target = sheetsync.Sheet(credentials=creds,
                              document_name = new_doc_name,
-                             sheet_name = 'Sheet1',
+                             worksheet_name = 'Sheet1',
                              folder_name = new_folder_name)
     # Delete the doc
-    gdc = target._doc_client_pool[GOOGLE_U]
-    target_rsrc = gdc.get_resource_by_id(target.document_key)
-    gdc.Delete(target_rsrc)
+    target.drive_service.files().delete(fileId=target.document_key).execute()
+
     # Delete the new folder too..
-    folder_key = target.folder.GetId().rsplit('%3A',1)[1]
-    folder_rsrc = gdc.get_resource_by_id(folder_key)
-    gdc.Delete(folder_rsrc)
+    assert new_folder_name == target.folder['title']
+    target.drive_service.files().delete(fileId=target.folder['id']).execute()
 
 
 def test_the_kartik_test():
     # The most basic usage of creating a new sheet and adding data to it.
     # From April, Google defaults to using new-style sheets which requires
     # workarounds right now.
+    creds = sheetsync.ia_credentials_helper(CLIENT_ID, CLIENT_SECRET, 
+                    credentials_cache_file='credentials.json',
+                    cache_key='default')
 
-    new_doc_name = '%s %s' % (__name__, int(time.time()))
-    target = sheetsync.Sheet(GOOGLE_U,
-                             GOOGLE_P,
+    new_doc_name = '%s-%s-%s' % (__name__, sys._getframe().f_code.co_name, int(time.time()))
+    target = sheetsync.Sheet(credentials=creds,
                              document_name = new_doc_name)
     # Check we can sync data to the newly created sheet.
     data = {"1" : {"name" : "Gordon", "color" : "Green"},
@@ -94,7 +100,7 @@ def test_the_kartik_test():
     assert retrieved_data["2"]["Key"] == "2"
 
     # Try opening the doc with a new instance (thereby guessing key columns)
-    test_read = sheetsync.Sheet(GOOGLE_U, GOOGLE_P,
+    test_read = sheetsync.Sheet(credentials=creds,
                                 document_name = new_doc_name)
     retrieved_data_2 = test_read.data()
     assert "1" in retrieved_data_2
@@ -102,7 +108,4 @@ def test_the_kartik_test():
     assert retrieved_data["2"]["color"] == "Blue"
 
     # Delete the doc
-    gdc = target._doc_client_pool[GOOGLE_U]
-    target_rsrc = gdc.get_resource_by_id(target.document_key)
-    gdc.Delete(target_rsrc)
-
+    target.drive_service.files().delete(fileId=target.document_key).execute()

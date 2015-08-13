@@ -7,25 +7,30 @@ import time, os
 
 # TODO: Use this: http://stackoverflow.com/questions/22574109/running-tests-with-api-authentication-in-travis-ci-without-exposing-api-password
 
-GOOGLE_U = os.environ.get("SHEETSYNC_GOOGLE_ACCOUNT")
-GOOGLE_P = os.environ.get("SHEETSYNC_GOOGLE_PASSWORD")
+CLIENT_ID = os.environ['SHEETSYNC_CLIENT_ID']  
+CLIENT_SECRET = os.environ['SHEETSYNC_CLIENT_SECRET']
 # Optional folder_key that all spreadsheets, and folders, will be created in.
 TESTS_FOLDER = os.environ.get("SHEETSYNC_FOLDER_KEY")
 
 # Template hosted by a dedicated "sheetsync" account that Mark set up.
-TEMPLATE_DOC = "0AsrRHMfAlOZrdFlLLWlzM2dhZ0tyS1k5RUxmVGU3cEE"
+TEMPLATE_DOC = "1-jjFDO11zLo6i6vpL7LbdhNMUJTAnjYVhUT7ZHMMtKQ"
 
 target = None
 
 def setup_function(function):
     global target
+    print ('setup_function: Retrieve OAuth2.0 credentials.')
+    creds = sheetsync.ia_credentials_helper(CLIENT_ID, CLIENT_SECRET, 
+                    credentials_cache_file='credentials.json',
+                    cache_key='default')
+
+
     print ('setup_function: Create test spreadsheet.')
     # Copy the template spreadsheet into the prescribed folder.
     new_doc_name = '%s %s' % (__name__, int(time.time()))
-    target = sheetsync.Sheet(GOOGLE_U,
-                             GOOGLE_P,
+    target = sheetsync.Sheet(credentials=creds,
                              document_name = new_doc_name,
-                             sheet_name = "Arsenal",
+                             worksheet_name = "Arsenal",
                              folder_key = TESTS_FOLDER,
                              template_key = TEMPLATE_DOC,
                              key_column_headers = ["No."],
@@ -36,9 +41,7 @@ def setup_function(function):
 
 def teardown_function(function):
     print ('teardown_function Delete test spreadsheet')
-    gdc = target._doc_client_pool[GOOGLE_U]
-    target_rsrc = gdc.get_resource_by_id(target.document_key)
-    gdc.Delete(target_rsrc)
+    target.drive_service.files().delete(fileId=target.document_key).execute()
 
 
 def test_protected_fields():

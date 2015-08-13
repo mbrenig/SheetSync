@@ -10,15 +10,15 @@ import time, os
 # TODO: Remove the need for the tests_folder key by automatically creating the
 #       folder
 
-GOOGLE_U = os.environ.get("SHEETSYNC_GOOGLE_ACCOUNT")
-GOOGLE_P = os.environ.get("SHEETSYNC_GOOGLE_PASSWORD")
+CLIENT_ID = os.environ['SHEETSYNC_CLIENT_ID']  
+CLIENT_SECRET = os.environ['SHEETSYNC_CLIENT_SECRET']
 # Optional folder_key that all spreadsheets, and folders, will be created in.
 TESTS_FOLDER = os.environ.get("SHEETSYNC_FOLDER_KEY")
 
 # Template hosted by a dedicated "sheetsync" account that Mark set up.
 # This contains half the 03/04 Arsenal squad. We will add to it, delete from it
 # and more.
-TEMPLATE_DOC = "0AsrRHMfAlOZrdFlLLWlzM2dhZ0tyS1k5RUxmVGU3cEE"
+TEMPLATE_DOC = "1-jjFDO11zLo6i6vpL7LbdhNMUJTAnjYVhUT7ZHMMtKQ"
 
 target = None
 
@@ -74,7 +74,7 @@ ARSENAL_0304 = {'1': {'Apps': '54',
         'Pos.': 'MF'},
  '22': {'Apps': '22',
         'Goals': '0',
-        'Name': 'Ga\xc3\xabl Clichy',
+        'Name': u'Ga\xebl Clichy',
         'Nat.': ' FRA',
         'Pos.': 'DF'},
  '23': {'Apps': '50',
@@ -94,7 +94,7 @@ ARSENAL_0304 = {'1': {'Apps': '54',
         'Pos.': 'DF'},
  '28': {'Apps': '55',
         'Goals': '3',
-        'Name': 'Kolo Tour\xc3\xa9',
+        'Name': u'Kolo Tour\xe9',
         'Nat.': ' CIV',
         'Pos.': 'DF'},
  '3': {'Apps': '47',
@@ -104,7 +104,7 @@ ARSENAL_0304 = {'1': {'Apps': '54',
        'Pos.': 'DF'},
  '30': {'Apps': '15',
         'Goals': '4',
-        'Name': 'J\xc3\xa9r\xc3\xa9mie Aliadi\xc3\xa8re',
+        'Name': u'J\xe9r\xe9mie Aliadi\xe8re',
         'Nat.': ' FRA',
         'Pos.': 'FW'},
  '32': {'Apps': '1',
@@ -159,7 +159,7 @@ ARSENAL_0304 = {'1': {'Apps': '54',
         'Pos.': 'FW'},
  '55': {'Apps': '1',
         'Goals': '0',
-        'Name': '\xc3\x93lafur Ingi Sk\xc3\xbalason',
+        'Name': u'\xd3lafur Ingi Sk\xfalason',
         'Nat.': ' ISL',
         'Pos.': 'MF'},
  '56': {'Apps': '3',
@@ -169,12 +169,12 @@ ARSENAL_0304 = {'1': {'Apps': '54',
         'Pos.': 'FW'},
  '57': {'Apps': '3',
         'Goals': '1',
-        'Name': 'Cesc F\xc3\xa0bregas',
+        'Name': u'Cesc F\xe0bregas',
         'Nat.': ' ESP',
         'Pos.': 'MF'},
  '7': {'Apps': '51',
        'Goals': '19',
-       'Name': 'Robert Pir\xc3\xa8s',
+       'Name': u'Robert Pir\xe8s',
        'Nat.': ' FRA',
        'Pos.': 'MF'},
  '8': {'Apps': '44',
@@ -184,19 +184,24 @@ ARSENAL_0304 = {'1': {'Apps': '54',
        'Pos.': 'MF'},
  '9': {'Apps': '21',
        'Goals': '5',
-       'Name': 'Jos\xc3\xa9 Antonio Reyes',
+       'Name': u'Jos\xe9 Antonio Reyes',
        'Nat.': ' FRA',
        'Pos.': 'FW'}}
 
 def setup_function(function):
     global target
+    print ('setup_function: Retrieve OAuth2.0 credentials.')
+    creds = sheetsync.ia_credentials_helper(CLIENT_ID, CLIENT_SECRET, 
+                    credentials_cache_file='credentials.json',
+                    cache_key='default')
+
+
     print ('setup_function: Create test spreadsheet.')
     # Copy the template spreadsheet into the prescribed folder.
     new_doc_name = '%s %s' % (__name__, int(time.time()))
-    target = sheetsync.Sheet(GOOGLE_U,
-                             GOOGLE_P,
+    target = sheetsync.Sheet(creds,
                              document_name = new_doc_name,
-                             sheet_name = "Arsenal",
+                             worksheet_name = "Arsenal",
                              folder_key = TESTS_FOLDER,
                              template_key = TEMPLATE_DOC,
                              key_column_headers = ["No."],
@@ -206,9 +211,7 @@ def setup_function(function):
 
 def teardown_function(function):
     print ('teardown_function Delete test spreadsheet')
-    gdc = target._doc_client_pool[GOOGLE_U]
-    target_rsrc = gdc.get_resource_by_id(target.document_key)
-    gdc.Delete(target_rsrc)
+    target.drive_service.files().delete(fileId=target.document_key).execute()
 
 def test_insert_row():
     print ('Add enough rows to spreadsheet that it needs extending')
@@ -282,5 +285,5 @@ def test_inject_only():
     assert "19" in new_raw_data
     assert "57" in new_raw_data
     assert "32" in new_raw_data
-    assert new_raw_data["57"]["Name"] == 'Cesc F\xc3\xa0bregas'
+    assert new_raw_data["57"]["Name"] == u'Cesc F\xe0bregas'
 
