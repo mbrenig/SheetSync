@@ -3,8 +3,7 @@ SheetSync
 
 |Build Status|
 
-A python library to create, update and delete rows of data in a google spreadsheet. `Click here to read the full documentation.
-<http://sheetsync.readthedocs.org/>`_.
+A python library to create, update and delete rows of data in a google spreadsheet. `Click here to read the full documentation<http://sheetsync.readthedocs.org/>`_.
 
 Installation
 ------------
@@ -27,15 +26,14 @@ before using sheetsync.
 
 Read the step-by-step `getting started guide<http://sheetsync.readthedocs.org/en/latest/getting_started.html>`_ for instructions.
 
-Example: Injecting data to a Google sheet
------------------------------------------
-sheetsync works with data in a dictionary of dictionaries. Each row is
+Injecting data to a Google sheet
+--------------------------------
+SheetSync works with data in a dictionary of dictionaries. Each row is
 represented by a dictionary, and these are themselves stored in a dictionary
 indexed by a row-specific key. For example this dictionary represents two rows
 of data each with columns "Color" and "Performer":
 
 .. code-block:: python
-   :linenos:
 
    data = { "Kermit": {"Color" : "Green", "Performer" : "Jim Henson"},
             "Miss Piggy" : {"Color" : "Pink", "Performer" : "Frank Oz"}
@@ -45,7 +43,6 @@ To insert this data (add or update rows) into a target
 worksheet in a google spreadsheet doc use this code:
 
 .. code-block:: python
-   :linenos:
 
    import logging
    from sheetsync import Sheet, ia_credentials_helper
@@ -89,8 +86,7 @@ and access the data as follows:
                    worksheet_name='Sheet1')
     print source.data()
 
-.. note::
-   The 'inject' method only adds or updates rows. If you want to delete rows from the spreadsheet to keep it in sync with the input data then use the 'sync' method.
+The 'inject' method only adds or updates rows. If you want to delete rows from the spreadsheet to keep it in sync with the input data then use the 'sync' method.
 
 Full documentation
 ------------------
