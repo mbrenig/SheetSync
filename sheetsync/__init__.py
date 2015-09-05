@@ -13,18 +13,6 @@
     :license: MIT, see LICENSE.txt for more details.
 """
 
-#----------MONKEY PATCH---------------------------------------------------
-import ssl
-try:
-    _create_unverified_https_context = ssl._create_unverified_context
-except AttributeError:
-    # Legacy Python that doesn't verify HTTPS certificates by default
-    pass
-else:
-    # Handle target environment that doesn't support HTTPS verification
-    ssl._create_default_https_context = _create_unverified_https_context
-#-----------END MONKEY PATCH----------------------------------------------
-
 from version import __version__
 
 import logging
@@ -54,8 +42,12 @@ def ia_credentials_helper(client_id, client_secret,
                           cache_key="default"):
     """Helper function to manage a credentials cache during testing.
 
-    This function will attempt to load and refresh a credentials object from a
-    json cache file.
+    This function attempts to load and refresh a credentials object from a
+    json cache file, using the cache_key and client_id as a lookup.
+
+    If this isn't found then it starts an OAuth2 authentication flow, using
+    the client_id and client_secret and if successful, saves those to the local
+    cache. See :ref:`helper`.
   
     Args:
         client_id (str): Google Drive API client id string for an installed app
@@ -65,7 +57,8 @@ def ia_credentials_helper(client_id, client_secret,
            to be stored in the cache.
 
     Returns:
-        OAuth2Credentials: A google api credentials object.
+        OAuth2Credentials: A google api credentials object. As described here:
+        https://developers.google.com/api-client-library/python/guide/aaa_oauth
 
     """
     def _load_credentials(key):
@@ -175,6 +168,16 @@ class DuplicateRows(Exception):
     pass
 
 class UpdateResults(object):
+    """ A lightweight counter object that holds statistics about number of
+    updates made after using the 'sync' or 'inject' method. 
+    
+    Attributes:
+      added (int): Number of rows added
+      changed (int): Number of rows changed                
+      nochange (int): Number of rows that were not modified.
+      deleted (int): Number of rows deleted (which will always be 0 when using
+          the 'inject' function)
+    """
     def __init__(self):
         self.added = 0
         self.changed = 0
@@ -258,16 +261,16 @@ class Sheet(object):
     """ Represents a single worksheet within a google spreadsheet.
     
     This class tracks the google connection, the reference to the worksheet, as
-    well as options governing the structure of the data in the worksheet.. for
-    instance:
-        * Where the header row is found
-        * What header should be used for the key column(s)
-        * Whether some columns are protected
+    well as options controlling the structure of the data in the worksheet.. for
+    example:
+        * Which row is used as the table header
+        * What header names should be used for the key column(s)
+        * Whether some columns are protected from overwriting
    
     Attributes:
-       document_key (str): The key of the spreadsheet. If you are relying on
-           sheetsync to automatically create a spreadsheet then use this
-           attribute to access the document_key.. and make sure you pass 
+       document_key (str): The spreadsheet's document key assigned by google 
+           drive. If you are using sheetsync to create a spreadsheet then use 
+           this attribute to saved the document_key, and make sure you pass 
            it as a parameter in subsequent calls to __init__
        document_name (str): The title of the google spreadsheet document
        document_href (str): The HTML href for the google spreadsheet document
@@ -285,76 +288,71 @@ class Sheet(object):
                  # Document creation behavior
                  template_key=None, template_name=None,
                  folder_key=None, folder_name=None):
-        """Creates a worksheet object (creating the Google doc if required)
+        """Creates a worksheet object (also creating a new Google sheet doc if required)
 
         Args:
             credentials (OAuth2Credentials): Credentials object returned by the
                 google authorization server. Described in detail in this article:
                 https://developers.google.com/api-client-library/python/guide/aaa_oauth
-                For testing and development consider using the helper function:
-                    sheetsync.ia_credentials_helper()
-            document_key (str): Document key for the existing spreadsheet to
-                sync data to. This is a long hex string and can be found in the 
-                URL of the spreadsheet. See this article for more:
+                For testing and development consider using the `ia_credentials_helper`
+                helper function
+            document_key (Optional) (str): Document key for the existing spreadsheet to
+                sync data to. More info here:
                 https://productforums.google.com/forum/#!topic/docs/XPOR9bTTS50
-            document_name (str): The name of the spreadsheet to sync to, if
-                this is not found - it will be created. If known, identifying the 
-                document by the document_key is faster.
+                If this is not provided sheetsync will use document_name to try and
+                find the correct spreadsheet.
+            document_name (Optional) (str): The name of the spreadsheet document to 
+                access. If this is not found it will be created. If you know
+                the document_key then using that is faster and more reliable.
             worksheet_name (str): The name of the worksheet inside the spreadsheet
                 that data will be synced to. If omitted then the default name
-                "sheetsync data" will be used, and a worksheet created if
+                "Sheet1" will be used, and a matching worksheet created if
                 necessary.
-            key_column_headers (list of str): Data in the key column(s) uniquely
+            key_column_headers (Optional) (list of str): Data in the key column(s) uniquely
                 identifies a row in your data. So, for example, if your data is 
                 indexed by a single username string, that you want to store in a
                 column with the header 'Username', you would pass this:
-                    key_column_headers=["Username"]
-                However, we also support component keys. Python dictionaries can
-                use tuples as keys, if you pass in a tuple like:
-                    ("Tesla","Model-S","2013")
-                then you could pass in a list of three column headers, e.g.:
-                    ["Make", "Model", "Year"]
+                    key_column_headers=['Username']
+                However, sheetsync also supports component keys. Python dictionaries can
+                use tuples as keys, for example if you had a tuple key like
+                this:
+                    ('Tesla', 'Model-S', '2013')
+                You can make the column meanings clear by passing in a list of
+                three key_column_headers:
+                    ['Make', 'Model', 'Year']
                 If no value is given, then the default behavior is to name the
-                column "Key"; or "Key-1", "Key-2", ... if your dictionary keys are
-                tuples.
-            header_row_ix (int): The row number we expect to see column headers
+                column "Key"; or "Key-1", "Key-2", ... if your data dictionaries 
+                keys are tuples.
+            header_row_ix (Optional) (int): The row number we expect to see column headers
                 in. Defaults to 1 (the very top row).
-            formula_ref_row_ix (int): If you want formulas to be added to some
-                cells when inserting new rows then use a formula reference row. We
-                recommend you use row 1 for formula references (then hide that row)
-                and start the header on row 2.
-                As an example, imagine you have a column A containing product 
-                indexes and want to have a column B containing hyperlinks
-                to a page describing the product. You could populate cell B1 with
-                the formula:
-                  =Hyperlink(Concatenate("http://widgets.com/product/",RC[-1]),RC[-1])
-                When adding rows to the spreadsheet, sheetsync will copy this
-                formula into the B column.
-            flag_deletes (bool): Specify if deleted rows should only be flagged
+            formula_ref_row_ix (Optional) (int): If you want formulas to be added to some
+                cells when inserting new rows then use a formula reference row. 
+                See :ref:`formulas` for an example use.
+            flag_deletes (Optional) (bool): Specify if deleted rows should only be flagged
                 for deletion. By default sheetsync does not delete rows of data, it
                 just marks that they are deleted by appending the string 
                 " (DELETED)" to key values. If you pass in the value "False" then
-                rows of data will be deleted by the sync() method if they are not
-                found in the input data. Use the inject() method if you only want
-                to add data to a worksheet.
-            protected_fields (list of str): An optional list of fields (column 
+                rows of data will be deleted by the sync method if they are not
+                found in the input data. Note, use the inject method if you only want
+                to add or modify data to in a worksheet.
+            protected_fields (Optional) (list of str): An list of fields (column 
                 headers) that contain protected data. sheetsync will only write to 
                 cells in these columns if they are blank. This can be useful if you
                 are expecting users of the spreadsheet to colaborate on the document
                 and edit values in certain columns (e.g. modifying a "Test result" 
                 column from "PENDING" to "PASSED") and don't want to overwrite
                 their edits.
-            template_key (str): This optional key references the spreadsheet 
+            template_key (Optional) (str): This optional key references the spreadsheet 
                 that will be copied if a new spreadsheet needs to be created. 
                 This is useful for copying over formatting, a specific header 
-                order, or apps-script functions.
-            template_name (str): As with template_key but the name of the
+                order, or apps-script functions. See :ref:`templates`.
+            template_name (Optional) (str): As with template_key but the name of the
                 template spreadsheet. If known, using the template_key will be
                 faster.
-            folder_key (str): This optional key references the folder that a new
+            folder_key (Optional) (str): This optional key references the folder that a new
                 spreadsheet will be moved to if a new spreadsheet needs to be
                 created.
-            folder_name (str): Like folder_key this parameter specifies the
+            folder_name (Optional) (str): Like folder_key this parameter specifies the
                 optional folder that a spreadsheet will be created in (if
                 required). If a folder matching the name cannot be found, sheetsync
                 will attempt to create it.
@@ -742,15 +740,15 @@ class Sheet(object):
         self._flush_writes()
 
     def backup(self, backup_name, folder_key=None, folder_name=None):
-        """Makes a copy of the spreadsheet with the name and folder specified. 
+        """Copies the google spreadsheet to the backup_name and folder specified. 
         
         Args:
           backup_name (str): The name of the backup document to create.
 
-          folder_key (str): The optional key of a folder that the backup will
+          folder_key (Optional) (str): The key of a folder that the new copy will
             be moved to.
          
-          folder_name (str): Like folder_key, references the folder to move a
+          folder_name (Optional) (str): Like folder_key, references the folder to move a
             backup to. If the folder can't be found, sheetsync will create it.
 
         """
@@ -793,7 +791,15 @@ class Sheet(object):
 
     def data(self, as_cells=False):
         """ Reads the worksheet and returns an indexed dictionary of the
-        row objects. """
+        row objects.
+        
+        For example:
+
+        >>>print sheet.data()
+
+        {'Miss Piggy': {'Color': 'Pink', 'Performer': 'Frank Oz'}, 'Kermit': {'Color': 'Green', 'Performer': 'Jim Henson'}} 
+        
+        """
         sheet_data = {}
         self.max_row = max(self.header_row_ix, self.formula_ref_row_ix)
         all_cells = self._cell_feed(row=self.max_row+1,
@@ -860,11 +866,41 @@ class Sheet(object):
     # sync and update.
     #--------------------------------------------------------------------------
     def sync(self, raw_data, row_change_callback=None):
-        """ TODO: Document this func """
+        """ Equivalent to the inject method but will delete rows from the
+        google spreadsheet if their key is not found in the input (raw_data) 
+        dictionary.
+    
+        Args:
+            raw_data (dict): See inject method
+            row_change_callback (Optional) (func): See inject method
+
+        Returns:
+            UpdateResults (object): See inject method
+        """
         return self._update(raw_data, row_change_callback, delete_rows=True)
 
     def inject(self, raw_data, row_change_callback=None):
-        """ TODO: Document this also """
+        """ Use this function to add rows or update existing rows in the
+        spreadsheet.
+    
+        Args: 
+          raw_data (dict): A dictionary of dictionaries. Where the keys of the
+             outer dictionary uniquely identify each row of data, and the inner
+             dictionaries represent the field,value pairs for a row of data.
+   
+          row_change_callback (Optional) (func): A callback function that you
+             can use to track changes to rows on the spreadsheet. The
+             row_change_callback function must take four parameters like so:
+
+             change_callback(row_key, 
+                             row_dict_before, 
+                             row_dict_after, 
+                             list_of_changed_keys)
+
+        Returns:
+          UpdateResults (object): A simple counter object providing statistics
+            about the changes made by sheetsync.
+        """
         return self._update(raw_data, row_change_callback, delete_rows=False)
 
     def _update(self, raw_data, row_change_callback=None, delete_rows=False):

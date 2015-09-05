@@ -1,32 +1,31 @@
 Getting Started
 ===============
-sheetsync is a python library to create, update and delete rows of data within a google spreadsheet.
+SheetSync is a python library to create, update and delete rows of data in a google spreadsheet.
 
 Installation
 ------------
-Install from PyPi using `pip <http://www.pip-installer.org/en/latest/>`_, a
-package manager for Python::
+Install from PyPi using `pip <http://www.pip-installer.org/en/latest/>`_::
 
   pip install sheetsync
 
-Or to develop this library further, you can clone the git repo and install::
+Or you can clone the git repo and install from the code::
 
-  git clone git@github.com:mbrenig/sheetsync.git sheetsyncRepo
-  pip install sheetsyncRepo
+  git clone git@github.com:mbrenig/sheetsync.git LocalSheetSync
+  pip install LocalSheetSync
 
 Note, you may need to run the commands above with ``sudo``.
 
 Setting up OAuth 2.0 access
 ---------------------------
-In `May 2015 <http://googledevelopers.blogspot.co.uk/2015/04/a-final-farewell-to-clientlogin-oauth.html>`_ Google retired old API access methods, and recommended users migrate to
+In May 2015 Google `retired old API access methods<http://googledevelopers.blogspot.co.uk/2015/04/a-final-farewell-to-clientlogin-oauth.html>`_, and recommended users migrate to
 `OAuth 2.0 <https://developers.google.com/identity/protocols/OAuth2?utm_campaign=oauth-415&utm_source=gdbc&utm_medium=blog>`_. OAuth2.0 is better for security and privacy 
 but it means getting started with sheetsync involves a bit of extra configuration.
 
-The steps below (written in 2015) guide you through API configuration and a simple script to manipulate a Google sheet. They will take around 15 minutes to complete.
+The steps below (written in 2015) guide you through API configuration and a simple script to manipulate a Google sheet. They will take around 20 minutes to complete.
 
 .. warning:: This tutorial is designed to get you using sheetsync quickly. It is **insecure** because your client secret is stored in plain text. If someone obtains your client secret, they could use it to consume your quota, incur charges or request access to user data.
 
-   Before using sheetsync in production you must learn about `Client IDs <https://developers.google.com/api-client-library/python/guide/aaa_oauth>`_ and replace the ``ia_credentials_helper()`` function with your own function that manages authentication and creates an `OAuth2Credentials <https://google-api-python-client.googlecode.com/hg/docs/epy/oauth2client.client.OAuth2Credentials-class.html>`_ object.
+   Before using sheetsync in production you should learn about `Client IDs <https://developers.google.com/api-client-library/python/guide/aaa_oauth>`_ and replace the ``ia_credentials_helper()`` function with your own function that manages authentication and creates an `OAuth2Credentials <https://google-api-python-client.googlecode.com/hg/docs/epy/oauth2client.client.OAuth2Credentials-class.html>`_ object.
 
 New Project
 ~~~~~~~~~~~
@@ -83,6 +82,8 @@ Click through to the Drive API and "Enable API":
 
 You're now ready to start using this Client ID information with sheetsync. 
 
+.. _helper:
+
 Injecting data to a Google sheet
 --------------------------------
 sheetsync works with data in a dictionary of dictionaries. Each row is
@@ -97,8 +98,8 @@ of data each with columns "Color" and "Performer":
             "Miss Piggy" : {"Color" : "Pink", "Performer" : "Frank Oz"}
            }
 
-To insert this data (add or update rows) with a target
-sheet in a google spreadsheet document you do this:
+To insert this data (add or update rows) into a target
+worksheet in a google spreadsheet doc use this code:
 
 .. code-block:: python
    :linenos:
@@ -109,7 +110,7 @@ sheet in a google spreadsheet document you do this:
    logging.getLogger('sheetsync').setLevel(logging.DEBUG)
    logging.basicConfig()
 
-   # Create credentials, or recover from a cache.
+   # Create OAuth2 credentials, or reload them from a local cache file.
    CLIENT_ID = '171566521677-3ppd15g5u4lv93van0eri4tbk4fmaq2c.apps.googleusercontent.com'
    CLIENT_SECRET = 'QJN*****************hk-i'
    creds = ia_credentials_helper(CLIENT_ID, CLIENT_SECRET, 
@@ -132,8 +133,8 @@ you to grant the script access, like this:
 
 .. image:: oauth_imgs/10.TheInstalledApplicationCredentialsHelper.jpg
 
-From this URL (you may have to log in to a Google Drive
-account) you will be prompted to give the API Client you set up in section 1.2, access to your documents:
+From this URL (you may have to log in to a Google Drive account) you will be 
+prompted to give the API Client you set up in section 1.2, access to your documents:
 
 .. image:: oauth_imgs/11.GrantPermission.jpg
 
@@ -159,13 +160,14 @@ spreadsheet's document key from the URL:
 
 .. image:: URL.png
 
-and then inject new data by initializing the sheet as follows:
+and then you can inject new data to the existing document by initializing the sheet as follows:
 
 .. code-block:: python
    :linenos:
 
    target = Sheet(credentials=creds, 
-                  document_key="1bnieREGAyXZ2TnhXgYrlacCIY09Q2IfGXNZbjsvj82M")
+                  document_key="1bnieREGAyXZ2TnhXgYrlacCIY09Q2IfGXNZbjsvj82M",
+                  worksheet_name="Sheet1")
 
 .. note::
    The 'inject' method only adds or updates rows. If you want to delete rows from the spreadsheet to keep it in sync with the input data then use the 'sync' method described in the next section.

@@ -19,6 +19,8 @@ enough to do with the key_column_headers field:
                              document_name="Muppet Show Tonight",
                              key_column_headers=["Name"])
 
+.. _templates:
+
 Templates for Formatting
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Google's spreadsheet API doesn't currently allow control over 
@@ -67,6 +69,8 @@ code:
                             key_column_headers=["Name"],
                             template_key="1J__SpvQvI9S4bW-BkA0PmPykH8VVT9bdoWZ-AW7V_0U",
                             folder_key="0B8rRHMfAlOZrWUw4LUhZejk4c0E")
+
+.. _formulas:
 
 Formulas
 ~~~~~~~~
