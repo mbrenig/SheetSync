@@ -73,7 +73,7 @@ Enable Drive API
 ~~~~~~~~~~~~~~~~
 Next we need to associate `Drive API <https://developers.google.com/drive/>`_ access with these OAuth credentials. From the lefthand menu choose API and search for Drive:
 
-.. image:: oauth_imgs/08.FindDriveApi.jpg
+.. image:: oauth_imgs/08.FindDriveAPI.jpg
    :width: 600px
 
 Click through to the Drive API and "Enable API":
