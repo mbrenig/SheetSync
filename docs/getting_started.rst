@@ -17,7 +17,7 @@ Note, you may need to run the commands above with ``sudo``.
 
 Setting up OAuth 2.0 access
 ---------------------------
-In May 2015 Google `retired old API access methods<http://googledevelopers.blogspot.co.uk/2015/04/a-final-farewell-to-clientlogin-oauth.html>`_, and recommended users migrate to
+In May 2015 Google `retired old API access methods <http://googledevelopers.blogspot.co.uk/2015/04/a-final-farewell-to-clientlogin-oauth.html>`_, and recommended users migrate to
 `OAuth 2.0 <https://developers.google.com/identity/protocols/OAuth2?utm_campaign=oauth-415&utm_source=gdbc&utm_medium=blog>`_. OAuth2.0 is better for security and privacy 
 but it means getting started with sheetsync involves a bit of extra configuration.
 

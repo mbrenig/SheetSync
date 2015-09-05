@@ -3,7 +3,7 @@ SheetSync
 
 |Build Status|
 
-A python library to create, update and delete rows of data in a google spreadsheet. `Click here to read the full documentation<http://sheetsync.readthedocs.org/>`_.
+A python library to create, update and delete rows of data in a google spreadsheet. `Click here to read the full documentation <http://sheetsync.readthedocs.org/>`_.
 
 Installation
 ------------
@@ -24,7 +24,7 @@ The Google Drive API now requires the use of OAuth2.0. This means you will need
 to go through a bit of configuration to get an API Client ID and Client Secret
 before using sheetsync.
 
-Read the step-by-step `getting started guide<http://sheetsync.readthedocs.org/en/latest/getting_started.html>`_ for instructions.
+Read the step-by-step `getting started guide <http://sheetsync.readthedocs.org/en/latest/getting_started.html>`_ for instructions.
 
 Injecting data to a Google sheet
 --------------------------------
@@ -90,7 +90,7 @@ The 'inject' method only adds or updates rows. If you want to delete rows from t
 
 Full documentation
 ------------------
-Is available `here<http://sheetsync.readthedocs.org/>`_.
+Is available `here <http://sheetsync.readthedocs.org/>`_.
 
 Testing and development
 -----------------------
