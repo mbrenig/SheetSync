@@ -11,3 +11,6 @@ env:
   - secure: JXz6PyRINaRDTyUNV3bBDAWeOJCsWwflwMoTHGL7mXVWZReOeTVYzBt6qp3sy1pDqRzwfU76ivtJAKt4KH0RvZpFE0YcP5fBeecZent+lH5LACETe/9RzNFqaKe0JZLsRhQyjN51Xp7lMQDBqBLfLbP6CGX/2kFyn7gDrg5PCik=
   - secure: TSg7qhUR/AaN4Yf9KJJdilddjhyPk8KUeDM6ecp0r/4hR7XhoBqnrfTocxd/AncccoM2ZFCGR7sVOhfx48dAMMV4ZltvrIPVilyXOMpqrVVLkDbtRS4rpr3wipM5LVeoHCd1VEtLe6+PY7Fo1kHu/Q2K39q6UCxV5vLlhHk/gUI=
   - secure: dpwiJchVHaYfwA/1bsa3EZsbU0lJqiwla7c2xOyoqMPNlEeA1/2RAmizHrn8zgdJVb9tySbYrqiZKNr9hiiQszC3H61II9UhZnwjlMo9E40ovqw7emSf49Ya9eC4btMv62fQPgwGlbi+Nta3yLQnmKKGediwlu5L2m5bMzB/Obk=
+before_install:
+- openssl aes-256-cbc -K $encrypted_e93fcb95e1f6_key -iv $encrypted_e93fcb95e1f6_iv
+  -in credentials.json.enc -out credentials.json -d

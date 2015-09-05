@@ -12,6 +12,7 @@ import time, os
 
 CLIENT_ID = os.environ['SHEETSYNC_CLIENT_ID']  
 CLIENT_SECRET = os.environ['SHEETSYNC_CLIENT_SECRET']
+
 # Optional folder_key that all spreadsheets, and folders, will be created in.
 TESTS_FOLDER = os.environ.get("SHEETSYNC_FOLDER_KEY")
 
