@@ -5,9 +5,10 @@ mysecrets.bat
 .coverage
 htmlcov
 .tox
-SheetSync.egg-info
+*.egg-info
 build
 dist
 MANIFEST
 credentials.json
 docs/_build/**
+venv

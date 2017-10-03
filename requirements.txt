@@ -1,4 +1,4 @@
-python-dateutil>=1.5
-oauth2client>=1.4.11
-google-api-python-client>=1.4.0
-gspread>=0.2.5
+python-dateutil>=2.5.3
+oauth2client>=2.2.0
+google-api-python-client>=1.5.1
+gspread>=0.3.0

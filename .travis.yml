@@ -1,11 +1,11 @@
 language: python
 python:
-- '2.7'
+- '3.5'
 install:
-- pip install pytest==2.5.2
-- pip install .
+- pip install -r requirements-test.txt
+- pip install -r requirements.txt
 script:
-- py.test
+- py.test -vv tests
 env:
   global:
   - secure: JXz6PyRINaRDTyUNV3bBDAWeOJCsWwflwMoTHGL7mXVWZReOeTVYzBt6qp3sy1pDqRzwfU76ivtJAKt4KH0RvZpFE0YcP5fBeecZent+lH5LACETe/9RzNFqaKe0JZLsRhQyjN51Xp7lMQDBqBLfLbP6CGX/2kFyn7gDrg5PCik=

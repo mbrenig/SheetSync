@@ -35,8 +35,8 @@ of data each with columns "Color" and "Performer":
 
 .. code-block:: python
 
-   data = { "Kermit": {"Color" : "Green", "Performer" : "Jim Henson"},
-            "Miss Piggy" : {"Color" : "Pink", "Performer" : "Frank Oz"}
+   data = {'Kermit': {'Color': 'Green', 'Performer': 'Jim Henson'},
+           'Miss Piggy': {'Color': 'Pink', 'Performer': 'Frank Oz'}
            }
 
 To insert this data (add or update rows) into a target
@@ -56,13 +56,13 @@ worksheet in a google spreadsheet doc use this code:
    creds = ia_credentials_helper(CLIENT_ID, CLIENT_SECRET, 
                                  credentials_cache_file='cred_cache.json')
 
-   data = { "Kermit": {"Color" : "Green", "Performer" : "Jim Henson"},
-            "Miss Piggy" : {"Color" : "Pink", "Performer" : "Frank Oz"} }
+   data = {'Kermit': {'Color': 'Green', 'Performer': 'Jim Henson'},
+           'Miss Piggy': {'Color': 'Pink', 'Performer': 'Frank Oz'}}
 
    # Find or create a spreadsheet, then inject data.
    target = Sheet(credentials=creds, document_name="sheetsync Getting Started")
    target.inject(data)
-   print "Spreadsheet created here: %s" % target.document_href
+   print("Spreadsheet created here: %s" % target.document_href)
 
 The first part of this script imports the ``Sheet`` object and
 ``ia_credentials_helper`` function. This function is included to help you quickly
@@ -84,7 +84,7 @@ and access the data as follows:
     source = Sheet(credentials=creds,
                    document_key="1bnieREGAyXZ2TnhXgYrIacCIY09Q2lfGXNZbjsvJ82M",
                    worksheet_name='Sheet1')
-    print source.data()
+    print(source.data())
 
 The 'inject' method only adds or updates rows. If you want to delete rows from the spreadsheet to keep it in sync with the input data then use the 'sync' method.
 
