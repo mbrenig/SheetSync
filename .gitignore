@@ -6,6 +6,7 @@ mysecrets.bat
 htmlcov
 .tox
 SheetSync.egg-info
+sheetsync2.egg-info
 build
 dist
 MANIFEST

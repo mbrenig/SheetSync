@@ -1,19 +1,19 @@
-SheetSync
-=========
+SheetSync2
+==========
 
 |Build Status|
 
-A python library to create, update and delete rows of data in a google spreadsheet. `Click here to read the full documentation <http://sheetsync.readthedocs.org/>`_.
+A `python 2.7 <https://www.python.org/download/releases/2.7/>`_ library to create, update and delete rows of data in a google spreadsheet. `Click here to read the full documentation <http://sheetsync.readthedocs.org/>`_.
 
 Installation
 ------------
 Install from PyPi using `pip <http://www.pip-installer.org/en/latest/>`_::
 
-  pip install sheetsync
+  pip install sheetsync2
 
 Or you can clone the git repo and install from the code::
 
-  git clone git@github.com:mbrenig/sheetsync.git LocalSheetSync
+  git clone -b master27 git@github.com:mbrenig/sheetsync.git LocalSheetSync
   pip install LocalSheetSync
 
 Note, you may need to run the commands above with ``sudo``.
