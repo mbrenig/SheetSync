@@ -223,8 +223,7 @@ class Header(object):
 
     def set(self, col, header):
         if header in self.header_to_col and self.header_to_col[header] != col:
-            raise CorruptHeader("'%s' was found twice in row %s of %s" % (header, 
-                                        self.header_row_ix,  self.sheet_name))
+            raise CorruptHeader("'%s' was found twice in header row" % header)
         if col in self.col_to_header and self.col_to_header[col] != header:
             raise CorruptHeader("Header for column '%s' changed while running" % col)
         self.col_to_header[col] = header
